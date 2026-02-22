@@ -24,6 +24,10 @@ with open(args.src, "r") as src_f:
 tokenizer = Tokenizer(src_code)
 tokens = tokenizer.tokenize()
 
+print(tokens)
+
+exit(0)
+
 ast_parser = Parser(tokens)
 ast_tree = ast_parser.parse()
 
