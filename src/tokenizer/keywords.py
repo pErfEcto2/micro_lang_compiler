@@ -5,8 +5,17 @@ class KEYWORD(Token):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)
 
+
+KEYWORDS: dict[str, type[KEYWORD]] = {}
+
+def register_keyword(keyword_text):
+    def wrapper(cls):
+        KEYWORDS[keyword_text] = cls
+        return cls
+    return wrapper
+
+@register_keyword(";")
 class SEMICOLON(KEYWORD):
-    _keyword_text: str = ";"
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)
 
@@ -16,8 +25,8 @@ class SEMICOLON(KEYWORD):
     def __repr__(self) -> str:
         return str(self)
 
+@register_keyword("exit")
 class EXIT_KEYWORD(KEYWORD):
-    _keyword_text: str = "exit"
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)
 
@@ -27,6 +36,3 @@ class EXIT_KEYWORD(KEYWORD):
     def __repr__(self) -> str:
         return str(self)
 
-KEYWORDS: dict[str, type[KEYWORD]] = {}
-for cls in KEYWORD.__subclasses__():
-    KEYWORDS[cls._keyword_text] = cls
