@@ -1,4 +1,4 @@
-from parser.ast_nodes import ASTNode
+from parser.ast_node import ASTNode
 
 
 class Compiler:

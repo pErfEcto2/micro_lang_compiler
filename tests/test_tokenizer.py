@@ -123,17 +123,17 @@ class TestTokenizerStatements:
 class TestTokenizerLineNumbers:
     def test_first_line(self):
         tokens = Tokenizer("exit;").tokenize()
-        assert tokens[0]._line_number == 1
+        assert tokens[0].line_number == 1
 
     def test_second_line(self):
         tokens = Tokenizer("\nexit;").tokenize()
-        assert tokens[0]._line_number == 2
+        assert tokens[0].line_number == 2
 
     def test_multiple_lines(self):
         tokens = Tokenizer("exit;\nexit;\nexit;").tokenize()
-        assert tokens[0]._line_number == 1
-        assert tokens[2]._line_number == 2
-        assert tokens[4]._line_number == 3
+        assert tokens[0].line_number == 1
+        assert tokens[2].line_number == 2
+        assert tokens[4].line_number == 3
 
 
 class TestTokenizerErrors:

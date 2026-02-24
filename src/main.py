@@ -24,16 +24,12 @@ with open(args.src, "r") as src_f:
 tokenizer = Tokenizer(src_code)
 tokens = tokenizer.tokenize()
 
-print(tokens)
-
-exit(0)
-
 ast_parser = Parser(tokens)
 ast_tree = ast_parser.parse()
 
-# if ast_tree is None:
-#     print("something went wrong, AST tree is empty")
-#     exit(1)
+print()
+print(ast_tree)
+exit(0)
 
 compiler = Compiler(ast_tree)
 compiled_code = compiler.compile()
