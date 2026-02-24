@@ -1,5 +1,6 @@
 import argparse
 import os
+import subprocess
 from compiler.compiler import Compiler
 from tokenizer.tokenizer import Tokenizer
 from parser.parser import Parser
@@ -27,33 +28,40 @@ tokens = tokenizer.tokenize()
 ast_parser = Parser(tokens)
 ast_tree = ast_parser.parse()
 
-print()
-print(ast_tree)
-exit(0)
-
 compiler = Compiler(ast_tree)
 compiled_code = compiler.compile()
 
-# if compiled_code is None:
-#     print("something went wrong, compiled code is empty")
-#     exit(1)
+print(compiled_code)
 
 output_file_path = "a.out"
 if args.output is not None:
     output_file_path = args.output
 
-with open(output_file_path, "w") as out_f:
-    out_f.write(src_code)
-    print(f"created: {output_file_path}")
+asm_path = output_file_path + ".asm"
+obj_path = output_file_path + ".o"
+
+with open(asm_path, "w") as out_f:
+    out_f.write(compiled_code)
 
 if args.no_nasm:
-    print("no nasm")
+    print(f"created: {asm_path}")
     exit(0)
 
-# use nasm
+result = subprocess.run(["nasm", "-f", "elf64", asm_path, "-o", obj_path])
+if result.returncode != 0:
+    print("nasm failed")
+    exit(1)
 
 if args.no_linker:
-    print("no linker")
+    os.remove(asm_path)
+    print(f"created: {obj_path}")
     exit(0)
 
-# use ld
+result = subprocess.run(["ld", obj_path, "-o", output_file_path])
+if result.returncode != 0:
+    print("ld failed")
+    exit(1)
+
+os.remove(asm_path)
+os.remove(obj_path)
+print(f"created: {output_file_path}")

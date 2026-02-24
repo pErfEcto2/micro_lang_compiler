@@ -166,3 +166,13 @@ class TestTokenizerRepr:
     def test_identifier_repr(self):
         tokens = Tokenizer("foo").tokenize()
         assert repr(tokens[0]) == "IDENTIFIER(foo)"
+
+    def test_str_literal_repr(self):
+        from tokenizer.literals import STR_LITERAL
+        lit = STR_LITERAL(1, "hello")
+        assert repr(lit) == "STR_LITERAL(hello)"
+
+    def test_str_literal_str(self):
+        from tokenizer.literals import STR_LITERAL
+        lit = STR_LITERAL(1, "world")
+        assert str(lit) == "STR_LITERAL(world)"

@@ -18,5 +18,5 @@ Here's list of keywords and descriptions:
 17) ";" - end of the line (NOT IMPLEMENTED YET)
 18) "{" - beginning of a scope (NOT IMPLEMENTED YET)
 19) "}" - ending of a scope (NOT IMPLEMENTED YET)
-20) "exit" - exit a programm with given return code (NOT IMPLEMENTED YET)
+20) "exit" - exit a programm with given return code
 

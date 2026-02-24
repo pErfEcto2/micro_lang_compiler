@@ -164,6 +164,18 @@ class TestParserExpressions:
         assert isinstance(expr, STR_EXPRESSION)
         assert expr.val == ""
 
+    def test_int_expression_repr(self):
+        expr = INT_EXPRESSION(1, 42)
+        assert repr(expr) == "INT_EXPRESSION(42)"
+
+    def test_str_expression_repr(self):
+        expr = STR_EXPRESSION(1, "hello")
+        assert repr(expr) == "STR_EXPRESSION(hello)"
+
+    def test_str_expression_str(self):
+        expr = STR_EXPRESSION(1, "world")
+        assert str(expr) == "STR_EXPRESSION(world)"
+
 
 class TestParserProgramRepr:
     def test_program_str(self):
