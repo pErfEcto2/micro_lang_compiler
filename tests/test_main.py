@@ -53,7 +53,8 @@ class TestMainNoNasm:
                 with open(asm_path) as f:
                     content = f.read()
                 assert "global _start" in content
-                assert "mov rdi, 69" in content
+                assert "push 69" in content
+                assert "pop rdi" in content
         finally:
             os.unlink(src_path)
 
@@ -84,7 +85,8 @@ class TestMainNoNasm:
                     content = f.read()
                 assert "section .text" in content
                 assert "_start:" in content
-                assert "mov rdi, 42" in content
+                assert "push 42" in content
+                assert "pop rdi" in content
                 assert "syscall" in content
         finally:
             os.unlink(src_path)
@@ -106,7 +108,21 @@ class TestMainDefaultOutput:
 
 
 class TestMainCompiledOutput:
-    def test_prints_compiled_code_to_stdout(self):
+    def test_verbose_prints_compiled_code_to_stdout(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("exit 1;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-v", "-o", out_path, src_path)
+                assert "global _start" in result.stdout
+                assert "push 1" in result.stdout
+        finally:
+            os.unlink(src_path)
+
+    def test_no_asm_on_stdout_without_verbose(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
             f.write("exit 1;")
             src_path = f.name
@@ -115,12 +131,11 @@ class TestMainCompiledOutput:
             with tempfile.TemporaryDirectory() as tmpdir:
                 out_path = os.path.join(tmpdir, "test_out")
                 result = run_compiler("-n", "-o", out_path, src_path)
-                assert "global _start" in result.stdout
-                assert "mov rdi, 1" in result.stdout
+                assert "global _start" not in result.stdout
         finally:
             os.unlink(src_path)
 
-    def test_multiple_exits_in_output(self):
+    def test_verbose_multiple_exits_in_output(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
             f.write("exit 10;\nexit 20;")
             src_path = f.name
@@ -128,9 +143,9 @@ class TestMainCompiledOutput:
         try:
             with tempfile.TemporaryDirectory() as tmpdir:
                 out_path = os.path.join(tmpdir, "test_out")
-                result = run_compiler("-n", "-o", out_path, src_path)
-                assert "mov rdi, 10" in result.stdout
-                assert "mov rdi, 20" in result.stdout
+                result = run_compiler("-n", "-v", "-o", out_path, src_path)
+                assert "push 10" in result.stdout
+                assert "push 20" in result.stdout
         finally:
             os.unlink(src_path)
 

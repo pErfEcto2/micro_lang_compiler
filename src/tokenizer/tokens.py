@@ -12,7 +12,7 @@ class IDENTIFIER(Token):
         self.val: str = val
 
     def __str__(self) -> str:
-        return f"IDENTIFIER({self.val})"
+        return f"{self.val}"
 
     def __repr__(self) -> str:
         return str(self)

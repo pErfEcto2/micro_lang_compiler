@@ -20,7 +20,7 @@ class SEMICOLON(KEYWORD):
         super().__init__(line_num)
 
     def __str__(self) -> str:
-        return "SEMICOLON"
+        return ";"
 
     def __repr__(self) -> str:
         return str(self)
@@ -31,8 +31,46 @@ class EXIT_KEYWORD(KEYWORD):
         super().__init__(line_num)
 
     def __str__(self) -> str:
-        return "EXIT_KEYWORD"
+        return "exit"
 
     def __repr__(self) -> str:
         return str(self)
 
+@register_keyword("=")
+class EQUALS_KEYWORD(KEYWORD):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+
+    def __str__(self) -> str:
+        return "="
+
+    def __repr__(self) -> str:
+        return str(self)
+
+class MATH_OPERATION(KEYWORD):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+
+@register_keyword("+")
+class PLUS_KEYWORD(MATH_OPERATION):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+        self.bpower: int = 1
+
+    def __str__(self) -> str:
+        return "+"
+
+    def __repr__(self) -> str:
+        return str(self)
+
+@register_keyword("*")
+class MULTIPLY_KEYWORD(MATH_OPERATION):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+        self.bpower: int = 2
+
+    def __str__(self) -> str:
+        return "*"
+
+    def __repr__(self) -> str:
+        return str(self)

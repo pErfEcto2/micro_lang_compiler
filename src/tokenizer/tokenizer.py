@@ -1,4 +1,4 @@
-from tokenizer.keywords import KEYWORDS, SEMICOLON
+from tokenizer.keywords import EQUALS_KEYWORD, KEYWORDS, MULTIPLY_KEYWORD, PLUS_KEYWORD, SEMICOLON
 from tokenizer.literals import INT_LITERAL
 from tokenizer.tokens import Token, IDENTIFIER
 
@@ -39,12 +39,22 @@ class Tokenizer:
                 while self._peek() and self._peek() not in self._stop_chars:
                     number_char = self._consume()
                     if not number_char.isdigit():
-                        raise ValueError(f"invalid digit '{number_char}' in line {self._line_num}")
+                        self._idx -= 1
+                        break
                     number += number_char
                 tokens.append(INT_LITERAL(self._line_num, int(number)))
             
             elif char in [" ", "\t"]:
                 pass
+
+            elif char == "=":
+                tokens.append(EQUALS_KEYWORD(self._line_num))
+
+            elif char == "+":
+                tokens.append(PLUS_KEYWORD(self._line_num))
+
+            elif char == "*":
+                tokens.append(MULTIPLY_KEYWORD(self._line_num))
 
             elif char == ";":
                 tokens.append(SEMICOLON(self._line_num))

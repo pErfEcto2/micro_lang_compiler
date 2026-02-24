@@ -1,7 +1,7 @@
 from parser.statements import EXIT_STATEMENT
 from parser.program import PROGRAM
-from parser.expressions import EXPRESSION, INT_EXPRESSION, STR_EXPRESSION
-from tokenizer.keywords import EXIT_KEYWORD, SEMICOLON
+from parser.expressions import BINARY_EXPRESSION, EXPRESSION, INT_EXPRESSION, STR_EXPRESSION
+from tokenizer.keywords import EXIT_KEYWORD, MATH_OPERATION, SEMICOLON
 from tokenizer.literals import INT_LITERAL, STR_LITERAL
 from tokenizer.tokens import Token
 
@@ -19,32 +19,44 @@ class Parser:
         self._idx += 1
         return self._tokens[self._idx - 1]
 
-    def _assert_current_token_type(self, t: type, err_msg: str | None = None) -> None:
+    def _check_current_token_type(self, t: type) -> bool:
         if self._peek() is None:
             raise ValueError(f"expected '{t}' at the end of the program")
 
-        token = self._consume()
-        tt = type(token)
-        if tt != t:
-            raise ValueError(err_msg or f"expected '{t}' in line {token.line_number} ('{tt}' found)")
+        token = self._peek()
+        return type(token) == t
 
-    def _parse_expr(self) -> EXPRESSION:
-        token = self._consume()
+    def _assert_current_token_type(self, t: type, err_msg: str | None = None) -> None:
+        if not self._check_current_token_type(t):
+            token = self._peek()
+            raise ValueError(err_msg or f"expected '{t}' in line {token.line_number} ('{type(token)}' found)")
+
+    def _parse_expr(self, token, min_bp: int = 0) -> EXPRESSION:
         ln = token.line_number
 
         match token:
             case INT_LITERAL():
-                return INT_EXPRESSION(ln, token.val)
+                left = INT_EXPRESSION(ln, token.val)
+                
+                if not (self._peek() is not None and isinstance(self._peek(), MATH_OPERATION)):
+                    return left
 
-            case STR_LITERAL():
-                return STR_EXPRESSION(ln, token.val)
-
+                while True:
+                    op = self._peek()
+                    if not isinstance(op, MATH_OPERATION) or op.bpower < min_bp:
+                        break
+                    
+                    self._consume()
+                    right = self._parse_expr(self._consume(), min_bp + 1)
+                    left = BINARY_EXPRESSION(ln, left, op, right)
+                
+                return left
+                
             case _:
-                raise ValueError(f"unexpected expression '{token}' in line {token.line_number}")
-
+                raise ValueError(f"unexpected expression '{token}' in line {ln}")
 
     def _parse_exit_statement(self) -> EXIT_STATEMENT:
-        expr = self._parse_expr()
+        expr = self._parse_expr(self._consume())
         self._assert_current_token_type(SEMICOLON)
         return EXIT_STATEMENT(expr.line_number, expr)
 

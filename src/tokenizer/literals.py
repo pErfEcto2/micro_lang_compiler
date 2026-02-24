@@ -11,7 +11,7 @@ class INT_LITERAL(LITERAL):
         self.val: int = val
 
     def __str__(self) -> str:
-        return f"INT_LITERAL({self.val})"
+        return f"{self.val}"
 
     def __repr__(self) -> str:
         return str(self)
@@ -22,7 +22,7 @@ class STR_LITERAL(LITERAL):
         self.val: str = val
 
     def __str__(self) -> str:
-        return f"STR_LITERAL({self.val})"
+        return f"{self.val}"
 
     def __repr__(self) -> str:
         return str(self)

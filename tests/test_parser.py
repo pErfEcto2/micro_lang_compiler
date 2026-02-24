@@ -2,8 +2,8 @@ import pytest
 from parser.parser import Parser
 from parser.program import PROGRAM
 from parser.statements import EXIT_STATEMENT
-from parser.expressions import INT_EXPRESSION, STR_EXPRESSION
-from tokenizer.keywords import EXIT_KEYWORD, SEMICOLON
+from parser.expressions import BINARY_EXPRESSION, INT_EXPRESSION, STR_EXPRESSION
+from tokenizer.keywords import EXIT_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD, SEMICOLON
 from tokenizer.literals import INT_LITERAL, STR_LITERAL
 from tokenizer.tokens import IDENTIFIER
 
@@ -44,13 +44,10 @@ class TestParserExitStatement:
         stmt = program.statements[0]
         assert stmt.return_code.val == 999999
 
-    def test_exit_with_str(self):
+    def test_exit_with_str_raises(self):
         tokens = [EXIT_KEYWORD(1), STR_LITERAL(1, "hello"), SEMICOLON(1)]
-        program = Parser(tokens).parse()
-        stmt = program.statements[0]
-        assert isinstance(stmt, EXIT_STATEMENT)
-        assert isinstance(stmt.return_code, STR_EXPRESSION)
-        assert stmt.return_code.val == "hello"
+        with pytest.raises(ValueError, match="unexpected expression"):
+            Parser(tokens).parse()
 
     def test_exit_preserves_line_number(self):
         tokens = [EXIT_KEYWORD(5), INT_LITERAL(5, 1), SEMICOLON(5)]
@@ -149,32 +146,22 @@ class TestParserExpressions:
         assert expr.val == 255
         assert expr.line_number == 1
 
-    def test_str_expression_value(self):
+    def test_str_expression_raises(self):
         tokens = [EXIT_KEYWORD(1), STR_LITERAL(1, "world"), SEMICOLON(1)]
-        program = Parser(tokens).parse()
-        expr = program.statements[0].return_code
-        assert isinstance(expr, STR_EXPRESSION)
-        assert expr.val == "world"
-        assert expr.line_number == 1
-
-    def test_str_expression_empty(self):
-        tokens = [EXIT_KEYWORD(1), STR_LITERAL(1, ""), SEMICOLON(1)]
-        program = Parser(tokens).parse()
-        expr = program.statements[0].return_code
-        assert isinstance(expr, STR_EXPRESSION)
-        assert expr.val == ""
+        with pytest.raises(ValueError, match="unexpected expression"):
+            Parser(tokens).parse()
 
     def test_int_expression_repr(self):
         expr = INT_EXPRESSION(1, 42)
-        assert repr(expr) == "INT_EXPRESSION(42)"
+        assert repr(expr) == "42"
 
     def test_str_expression_repr(self):
         expr = STR_EXPRESSION(1, "hello")
-        assert repr(expr) == "STR_EXPRESSION(hello)"
+        assert repr(expr) == "hello"
 
     def test_str_expression_str(self):
         expr = STR_EXPRESSION(1, "world")
-        assert str(expr) == "STR_EXPRESSION(world)"
+        assert str(expr) == "world"
 
 
 class TestParserProgramRepr:
@@ -223,3 +210,49 @@ class TestParserIntegration:
         tokens = Tokenizer("foo;").tokenize()
         with pytest.raises(ValueError, match="unexpected token"):
             Parser(tokens).parse()
+
+    def test_full_pipeline_arithmetic(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("exit 1 + 2;").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        expr = program.statements[0].return_code
+        assert isinstance(expr, BINARY_EXPRESSION)
+
+
+class TestParserBinaryExpressions:
+    def test_simple_addition(self):
+        tokens = [EXIT_KEYWORD(1), INT_LITERAL(1, 1), PLUS_KEYWORD(1), INT_LITERAL(1, 2), SEMICOLON(1)]
+        program = Parser(tokens).parse()
+        expr = program.statements[0].return_code
+        assert isinstance(expr, BINARY_EXPRESSION)
+        assert expr.lval.val == 1
+        assert expr.rval.val == 2
+
+    def test_simple_multiplication(self):
+        tokens = [EXIT_KEYWORD(1), INT_LITERAL(1, 3), MULTIPLY_KEYWORD(1), INT_LITERAL(1, 4), SEMICOLON(1)]
+        program = Parser(tokens).parse()
+        expr = program.statements[0].return_code
+        assert isinstance(expr, BINARY_EXPRESSION)
+        assert expr.lval.val == 3
+        assert expr.rval.val == 4
+
+    def test_multiply_binds_tighter_than_add(self):
+        # 1 + 2 * 3 → BINARY(1, +, BINARY(2, *, 3))
+        tokens = [
+            EXIT_KEYWORD(1),
+            INT_LITERAL(1, 1), PLUS_KEYWORD(1), INT_LITERAL(1, 2), MULTIPLY_KEYWORD(1), INT_LITERAL(1, 3),
+            SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        expr = program.statements[0].return_code
+        assert isinstance(expr, BINARY_EXPRESSION)
+        assert isinstance(expr.lval, INT_EXPRESSION)
+        assert expr.lval.val == 1
+        assert isinstance(expr.rval, BINARY_EXPRESSION)
+        assert expr.rval.lval.val == 2
+        assert expr.rval.rval.val == 3
+
+    def test_binary_expression_repr(self):
+        expr = BINARY_EXPRESSION(1, INT_EXPRESSION(1, 10), PLUS_KEYWORD(1), INT_EXPRESSION(1, 20))
+        assert repr(expr) == "10 + 20"

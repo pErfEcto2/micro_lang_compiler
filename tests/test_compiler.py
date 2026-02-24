@@ -2,7 +2,8 @@ import pytest
 from compiler.compiler import Compiler
 from parser.program import PROGRAM
 from parser.statements import EXIT_STATEMENT, STATEMENT
-from parser.expressions import INT_EXPRESSION, STR_EXPRESSION
+from parser.expressions import BINARY_EXPRESSION, INT_EXPRESSION, STR_EXPRESSION
+from tokenizer.keywords import MULTIPLY_KEYWORD, PLUS_KEYWORD
 
 
 def _make_program(*statements):
@@ -49,19 +50,22 @@ class TestCompilerExitStatement:
     def test_exit_with_int(self):
         prog = _make_program(EXIT_STATEMENT(1, INT_EXPRESSION(1, 69)))
         result = Compiler(prog).compile()
+        assert "    push 69" in result
+        assert "    pop rdi" in result
         assert "    mov rax, 60" in result
-        assert "    mov rdi, 69" in result
         assert "    syscall" in result
 
     def test_exit_with_zero(self):
         prog = _make_program(EXIT_STATEMENT(1, INT_EXPRESSION(1, 0)))
         result = Compiler(prog).compile()
-        assert "    mov rdi, 0" in result
+        assert "    push 0" in result
+        assert "    pop rdi" in result
 
     def test_exit_with_large_int(self):
         prog = _make_program(EXIT_STATEMENT(1, INT_EXPRESSION(1, 255)))
         result = Compiler(prog).compile()
-        assert "    mov rdi, 255" in result
+        assert "    push 255" in result
+        assert "    pop rdi" in result
 
     def test_exit_with_str_raises(self):
         prog = _make_program(EXIT_STATEMENT(1, STR_EXPRESSION(1, "hello")))
@@ -81,8 +85,8 @@ class TestCompilerMultipleStatements:
             EXIT_STATEMENT(2, INT_EXPRESSION(2, 2)),
         )
         result = Compiler(prog).compile()
-        assert "    mov rdi, 1" in result
-        assert "    mov rdi, 2" in result
+        assert "    push 1" in result
+        assert "    push 2" in result
 
     def test_exit_syscall_count(self):
         prog = _make_program(
@@ -118,8 +122,9 @@ class TestCompilerFullOutput:
             "global _start",
             "section .text",
             "_start:",
+            "    push 42",
+            "    pop rdi",
             "    mov rax, 60",
-            "    mov rdi, 42",
             "    syscall",
             "    mov rax, 60",
             "    mov rdi, 0",
@@ -143,6 +148,16 @@ class TestCompilerHelpers:
         c._pop("rbx")
         assert "    pop rbx" in c._asm_output
 
+    def test_add(self):
+        c = Compiler(_make_program())
+        c._add("rax", "rbx")
+        assert "    add rax, rbx" in c._asm_output
+
+    def test_mul(self):
+        c = Compiler(_make_program())
+        c._mul("rax", "rbx")
+        assert "    mul rax, rbx" in c._asm_output
+
 
 class TestCompilerErrors:
     def test_unexpected_statement_type(self):
@@ -156,6 +171,33 @@ class TestCompilerErrors:
             Compiler(prog).compile()
 
 
+class TestCompilerBinaryExpressions:
+    def test_addition(self):
+        expr = BINARY_EXPRESSION(1, INT_EXPRESSION(1, 10), PLUS_KEYWORD(1), INT_EXPRESSION(1, 20))
+        prog = _make_program(EXIT_STATEMENT(1, expr))
+        result = Compiler(prog).compile()
+        assert "    push 20" in result
+        assert "    push 10" in result
+        assert "    add rax, rbx" in result
+
+    def test_multiplication(self):
+        expr = BINARY_EXPRESSION(1, INT_EXPRESSION(1, 3), MULTIPLY_KEYWORD(1), INT_EXPRESSION(1, 4))
+        prog = _make_program(EXIT_STATEMENT(1, expr))
+        result = Compiler(prog).compile()
+        assert "    push 4" in result
+        assert "    push 3" in result
+        assert "    mul rax, rbx" in result
+
+    def test_nested_expression(self):
+        # 1 + 2 * 3 → BINARY(1, +, BINARY(2, *, 3))
+        inner = BINARY_EXPRESSION(1, INT_EXPRESSION(1, 2), MULTIPLY_KEYWORD(1), INT_EXPRESSION(1, 3))
+        outer = BINARY_EXPRESSION(1, INT_EXPRESSION(1, 1), PLUS_KEYWORD(1), inner)
+        prog = _make_program(EXIT_STATEMENT(1, outer))
+        result = Compiler(prog).compile()
+        assert "    mul rax, rbx" in result
+        assert "    add rax, rbx" in result
+
+
 class TestCompilerIntegration:
     def test_full_pipeline_exit(self):
         from tokenizer.tokenizer import Tokenizer
@@ -165,7 +207,8 @@ class TestCompilerIntegration:
         prog = Parser(tokens).parse()
         result = Compiler(prog).compile()
         assert "global _start" in result
-        assert "mov rdi, 69" in result
+        assert "push 69" in result
+        assert "pop rdi" in result
         assert "syscall" in result
 
     def test_full_pipeline_multiple_exits(self):
@@ -175,8 +218,8 @@ class TestCompilerIntegration:
         tokens = Tokenizer("exit 69;\nexit 70;").tokenize()
         prog = Parser(tokens).parse()
         result = Compiler(prog).compile()
-        assert "mov rdi, 69" in result
-        assert "mov rdi, 70" in result
+        assert "push 69" in result
+        assert "push 70" in result
 
     def test_full_pipeline_empty(self):
         from tokenizer.tokenizer import Tokenizer
@@ -187,3 +230,13 @@ class TestCompilerIntegration:
         result = Compiler(prog).compile()
         assert "global _start" in result
         assert "    mov rax, 60" in result
+
+    def test_full_pipeline_arithmetic(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("exit 1 + 2;").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    add rax, rbx" in result
+        assert "    pop rdi" in result

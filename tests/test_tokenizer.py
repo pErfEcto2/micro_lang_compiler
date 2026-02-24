@@ -62,9 +62,13 @@ class TestTokenizerLiterals:
         assert isinstance(tokens[0], INT_LITERAL)
         assert tokens[0].val == 999999
 
-    def test_invalid_digit_raises(self):
-        with pytest.raises(ValueError, match="invalid digit"):
-            Tokenizer("123abc").tokenize()
+    def test_number_followed_by_alpha(self):
+        tokens = Tokenizer("123abc").tokenize()
+        assert len(tokens) == 2
+        assert isinstance(tokens[0], INT_LITERAL)
+        assert tokens[0].val == 123
+        assert isinstance(tokens[1], IDENTIFIER)
+        assert tokens[1].val == "abc"
 
     def test_identifier(self):
         tokens = Tokenizer("foo").tokenize()
@@ -145,34 +149,80 @@ class TestTokenizerErrors:
         with pytest.raises(ValueError, match="line 2"):
             Tokenizer("\n@").tokenize()
 
-    def test_invalid_number_reports_line(self):
-        with pytest.raises(ValueError, match="line 1"):
-            Tokenizer("12x").tokenize()
+
+class TestTokenizerOperators:
+    def test_plus(self):
+        from tokenizer.keywords import PLUS_KEYWORD
+        tokens = Tokenizer("+").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], PLUS_KEYWORD)
+
+    def test_multiply(self):
+        from tokenizer.keywords import MULTIPLY_KEYWORD
+        tokens = Tokenizer("*").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], MULTIPLY_KEYWORD)
+
+    def test_equals(self):
+        from tokenizer.keywords import EQUALS_KEYWORD
+        tokens = Tokenizer("=").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], EQUALS_KEYWORD)
+
+    def test_arithmetic_expression(self):
+        from tokenizer.keywords import PLUS_KEYWORD, MULTIPLY_KEYWORD
+        tokens = Tokenizer("1+2*3").tokenize()
+        assert len(tokens) == 5
+        assert isinstance(tokens[0], INT_LITERAL)
+        assert isinstance(tokens[1], PLUS_KEYWORD)
+        assert isinstance(tokens[2], INT_LITERAL)
+        assert isinstance(tokens[3], MULTIPLY_KEYWORD)
+        assert isinstance(tokens[4], INT_LITERAL)
+
+    def test_arithmetic_with_spaces(self):
+        from tokenizer.keywords import PLUS_KEYWORD
+        tokens = Tokenizer("10 + 20").tokenize()
+        assert len(tokens) == 3
+        assert tokens[0].val == 10
+        assert isinstance(tokens[1], PLUS_KEYWORD)
+        assert tokens[2].val == 20
+
+    def test_plus_repr(self):
+        tokens = Tokenizer("+").tokenize()
+        assert repr(tokens[0]) == "+"
+
+    def test_multiply_repr(self):
+        tokens = Tokenizer("*").tokenize()
+        assert repr(tokens[0]) == "*"
+
+    def test_equals_repr(self):
+        tokens = Tokenizer("=").tokenize()
+        assert repr(tokens[0]) == "="
 
 
 class TestTokenizerRepr:
     def test_exit_keyword_repr(self):
         tokens = Tokenizer("exit").tokenize()
-        assert repr(tokens[0]) == "EXIT_KEYWORD"
+        assert repr(tokens[0]) == "exit"
 
     def test_semicolon_repr(self):
         tokens = Tokenizer(";").tokenize()
-        assert repr(tokens[0]) == "SEMICOLON"
+        assert repr(tokens[0]) == ";"
 
     def test_int_literal_repr(self):
         tokens = Tokenizer("42").tokenize()
-        assert repr(tokens[0]) == "INT_LITERAL(42)"
+        assert repr(tokens[0]) == "42"
 
     def test_identifier_repr(self):
         tokens = Tokenizer("foo").tokenize()
-        assert repr(tokens[0]) == "IDENTIFIER(foo)"
+        assert repr(tokens[0]) == "foo"
 
     def test_str_literal_repr(self):
         from tokenizer.literals import STR_LITERAL
         lit = STR_LITERAL(1, "hello")
-        assert repr(lit) == "STR_LITERAL(hello)"
+        assert repr(lit) == "hello"
 
     def test_str_literal_str(self):
         from tokenizer.literals import STR_LITERAL
         lit = STR_LITERAL(1, "world")
-        assert str(lit) == "STR_LITERAL(world)"
+        assert str(lit) == "world"

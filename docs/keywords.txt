@@ -4,9 +4,9 @@ Here's list of keywords and descriptions:
 3) "if/else" - branching (NOT IMPLEMENTED YET)
 4) "while" - loop (NOT IMPLEMENTED YET)
 5) "=" - assign (NOT IMPLEMENTED YET)
-6) "+" - addition (NOT IMPLEMENTED YET)
+6) "+" - addition
 7) "-" - subtraction (NOT IMPLEMENTED YET)
-8) "*" - multiplication (NOT IMPLEMENTED YET)
+8) "*" - multiplication
 9) "/" - Int32 division (NOT IMPLEMENTED YET)
 10) "%" - modulo (NOT IMPLEMENTED YET)
 11) ">" - greater (NOT IMPLEMENTED YET)

@@ -1,22 +1,13 @@
-from parser.expressions import EXPRESSION, INT_EXPRESSION, STR_EXPRESSION
+from parser.expressions import BINARY_EXPRESSION, EXPRESSION, INT_EXPRESSION
 from parser.program import PROGRAM
-from parser.statements import EXIT_STATEMENT, STATEMENT
+from parser.statements import EXIT_STATEMENT
+from tokenizer.keywords import MATH_OPERATION, MULTIPLY_KEYWORD, PLUS_KEYWORD
 
 
 class Compiler:
     def __init__(self, prog: PROGRAM) -> None:
         self._ast: PROGRAM = prog
-        # self._statements: list[STATEMENT] = prog.statements
-        # self._statements_len: int = len(self._statements)
         self._asm_output: list[str] = []
-        # self._idx: int = 0
-
-    # def _peek(self, offset: int = 0) -> STATEMENT | None:
-    #     return self._statements[self._idx + offset] if self._idx + offset < self._statements_len else None
-    #
-    # def _consume(self) -> STATEMENT:
-    #     self._idx += 1
-    #     return self._statements[self._idx - 1]
 
     def _gen_prefix(self) -> None:
         self._asm_output.append("global _start")
@@ -41,15 +32,40 @@ class Compiler:
     def _pop(self, var: str) -> None:
         self._asm_output.append(f"    pop {var}")
 
-    def _gen_exit(self, ret_code_expr: EXPRESSION) -> None:
-        match ret_code_expr:
-            case INT_EXPRESSION():
-                self._mov("rax", "60")
-                self._mov("rdi", str(ret_code_expr.val))
-                self._syscall()
+    def _add(self, lval: str, rval: str) -> None:
+        self._asm_output.append(f"    add {lval}, {rval}")
 
+    def _mul(self, lval: str, rval: str) -> None:
+        self._asm_output.append(f"    mul {lval}, {rval}")
+
+    def _eval_expr(self, expr: EXPRESSION) -> None:
+        match expr:
+            case INT_EXPRESSION():
+                self._push(str(expr.val))
+            case BINARY_EXPRESSION():
+                self._eval_expr(expr.rval)
+                self._eval_expr(expr.lval)
+                self._pop("rax")
+                self._pop("rbx")
+                match expr.op:
+                    case PLUS_KEYWORD():
+                        self._add("rax", "rbx")
+                        self._push("rax")
+                    case MULTIPLY_KEYWORD():
+                        self._mul("rax", "rbx")
+                        self._push("rax")
+                    case _:
+                        raise ValueError(f"invalid operation type '{type(expr.op)}' ('{type(MATH_OPERATION)}' expected)")
             case _:
-                raise ValueError(f"unexpected expression '{ret_code_expr}' for 'exit' in line {ret_code_expr.line_number}")
+                raise ValueError(f"unexpected expression '{expr}' for 'exit' in line {expr.line_number}")
+
+        return
+
+    def _gen_exit(self, ret_code_expr: EXPRESSION) -> None:
+        self._eval_expr(ret_code_expr)
+        self._pop("rdi")
+        self._mov("rax", "60")
+        self._syscall()
 
     def compile(self) -> str:
         self._gen_prefix()
