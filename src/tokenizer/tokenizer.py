@@ -1,4 +1,4 @@
-from tokenizer.keywords import EQUALS_KEYWORD, KEYWORDS, MULTIPLY_KEYWORD, PLUS_KEYWORD, SEMICOLON
+from tokenizer.keywords import ASSIGN_KEYWORD, INT_DIVISION_KEYWORD, KEYWORDS, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD, SEMICOLON
 from tokenizer.literals import INT_LITERAL
 from tokenizer.tokens import Token, IDENTIFIER
 
@@ -47,11 +47,23 @@ class Tokenizer:
             elif char in [" ", "\t"]:
                 pass
 
+            elif char == "/":
+                match self._peek():
+                    case "/":
+                        tokens.append(INT_DIVISION_KEYWORD(self._line_num))
+                        self._consume()
+
+            elif char == "%":
+                tokens.append(MODULO_KEYWORD(self._line_num))
+
             elif char == "=":
-                tokens.append(EQUALS_KEYWORD(self._line_num))
+                tokens.append(ASSIGN_KEYWORD(self._line_num))
 
             elif char == "+":
                 tokens.append(PLUS_KEYWORD(self._line_num))
+
+            elif char == "-":
+                tokens.append(MINUS_KEYWORD(self._line_num))
 
             elif char == "*":
                 tokens.append(MULTIPLY_KEYWORD(self._line_num))

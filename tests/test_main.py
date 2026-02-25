@@ -150,6 +150,54 @@ class TestMainCompiledOutput:
             os.unlink(src_path)
 
 
+class TestMainLetStatement:
+    def test_let_and_exit_creates_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("let x = 42;\nexit x;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "qword [rbp - 8]" in content
+                assert "pop rdi" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_let_with_arithmetic(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("let a = 1 + 2;\nexit a;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "add rax, rbx" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_verbose_let_shows_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("let x = 5;\nexit x;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-v", "-o", out_path, src_path)
+                assert "qword [rbp - 8]" in result.stdout
+        finally:
+            os.unlink(src_path)
+
+
 class TestMainSourceErrors:
     def test_invalid_token_fails(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:

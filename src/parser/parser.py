@@ -1,9 +1,9 @@
-from parser.statements import EXIT_STATEMENT
+from parser.statements import EXIT_STATEMENT, LET_STATEMENT
 from parser.program import PROGRAM
-from parser.expressions import BINARY_EXPRESSION, EXPRESSION, INT_EXPRESSION, STR_EXPRESSION
-from tokenizer.keywords import EXIT_KEYWORD, MATH_OPERATION, SEMICOLON
-from tokenizer.literals import INT_LITERAL, STR_LITERAL
-from tokenizer.tokens import Token
+from parser.expressions import BINARY_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION
+from tokenizer.keywords import ASSIGN_KEYWORD, EXIT_KEYWORD, LET_KEYWORD, MATH_OPERATION, SEMICOLON
+from tokenizer.literals import INT_LITERAL
+from tokenizer.tokens import IDENTIFIER, Token
 
 
 class Parser:
@@ -30,27 +30,32 @@ class Parser:
         if not self._check_current_token_type(t):
             token = self._peek()
             raise ValueError(err_msg or f"expected '{t}' in line {token.line_number} ('{type(token)}' found)")
+    
+    def _get_expr(self, left, min_bp, ln) -> EXPRESSION:
+        if not (self._peek() is not None and isinstance(self._peek(), MATH_OPERATION)):
+            return left
+
+        while True:
+            op = self._peek()
+            if not isinstance(op, MATH_OPERATION) or op.bpower < min_bp:
+                break
+            
+            self._consume()
+            right = self._parse_expr(self._consume(), min_bp + 1)
+            left = BINARY_EXPRESSION(ln, left, op, right)
+        
+        return left
 
     def _parse_expr(self, token, min_bp: int = 0) -> EXPRESSION:
         ln = token.line_number
-
         match token:
             case INT_LITERAL():
                 left = INT_EXPRESSION(ln, token.val)
-                
-                if not (self._peek() is not None and isinstance(self._peek(), MATH_OPERATION)):
-                    return left
+                return self._get_expr(left, min_bp, ln)
 
-                while True:
-                    op = self._peek()
-                    if not isinstance(op, MATH_OPERATION) or op.bpower < min_bp:
-                        break
-                    
-                    self._consume()
-                    right = self._parse_expr(self._consume(), min_bp + 1)
-                    left = BINARY_EXPRESSION(ln, left, op, right)
-                
-                return left
+            case IDENTIFIER():
+                left = IDENTIFIER_EXPRESSION(ln, token.val)
+                return self._get_expr(left, min_bp, ln)
                 
             case _:
                 raise ValueError(f"unexpected expression '{token}' in line {ln}")
@@ -60,6 +65,16 @@ class Parser:
         self._assert_current_token_type(SEMICOLON)
         return EXIT_STATEMENT(expr.line_number, expr)
 
+    def _parse_let_statement(self) -> LET_STATEMENT:
+        self._assert_current_token_type(IDENTIFIER)
+        identiefier = self._consume()
+        identiefier = IDENTIFIER_EXPRESSION(identiefier.line_number, identiefier.val)
+        self._assert_current_token_type(ASSIGN_KEYWORD)
+        self._consume()
+        expr = self._parse_expr(self._consume())
+        self._assert_current_token_type(SEMICOLON)
+        return LET_STATEMENT(expr.line_number, identiefier, expr)
+
     def parse(self) -> PROGRAM:
         program: PROGRAM = PROGRAM()
         while self._peek():
@@ -68,6 +83,9 @@ class Parser:
                 case EXIT_KEYWORD():
                     exit_statement = self._parse_exit_statement()
                     program.statements.append(exit_statement)
+                case LET_KEYWORD():
+                    let_statement = self._parse_let_statement()
+                    program.statements.append(let_statement)
                 case SEMICOLON():
                     continue
                 case _:

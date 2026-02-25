@@ -36,8 +36,19 @@ class EXIT_KEYWORD(KEYWORD):
     def __repr__(self) -> str:
         return str(self)
 
+@register_keyword("let")
+class LET_KEYWORD(KEYWORD):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+
+    def __str__(self) -> str:
+        return "let"
+
+    def __repr__(self) -> str:
+        return str(self)
+
 @register_keyword("=")
-class EQUALS_KEYWORD(KEYWORD):
+class ASSIGN_KEYWORD(KEYWORD):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)
 
@@ -63,6 +74,18 @@ class PLUS_KEYWORD(MATH_OPERATION):
     def __repr__(self) -> str:
         return str(self)
 
+@register_keyword("-")
+class MINUS_KEYWORD(MATH_OPERATION):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+        self.bpower: int = 1
+
+    def __str__(self) -> str:
+        return "-"
+
+    def __repr__(self) -> str:
+        return str(self)
+
 @register_keyword("*")
 class MULTIPLY_KEYWORD(MATH_OPERATION):
     def __init__(self, line_num: int) -> None:
@@ -71,6 +94,30 @@ class MULTIPLY_KEYWORD(MATH_OPERATION):
 
     def __str__(self) -> str:
         return "*"
+
+    def __repr__(self) -> str:
+        return str(self)
+
+@register_keyword("//")
+class INT_DIVISION_KEYWORD(MATH_OPERATION):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+        self.bpower: int = 2
+
+    def __str__(self) -> str:
+        return "//"
+
+    def __repr__(self) -> str:
+        return str(self)
+
+@register_keyword("%")
+class MODULO_KEYWORD(MATH_OPERATION):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+        self.bpower: int = 2
+
+    def __str__(self) -> str:
+        return "%"
 
     def __repr__(self) -> str:
         return str(self)

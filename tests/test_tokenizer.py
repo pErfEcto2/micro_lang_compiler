@@ -163,11 +163,11 @@ class TestTokenizerOperators:
         assert len(tokens) == 1
         assert isinstance(tokens[0], MULTIPLY_KEYWORD)
 
-    def test_equals(self):
-        from tokenizer.keywords import EQUALS_KEYWORD
+    def test_assign(self):
+        from tokenizer.keywords import ASSIGN_KEYWORD
         tokens = Tokenizer("=").tokenize()
         assert len(tokens) == 1
-        assert isinstance(tokens[0], EQUALS_KEYWORD)
+        assert isinstance(tokens[0], ASSIGN_KEYWORD)
 
     def test_arithmetic_expression(self):
         from tokenizer.keywords import PLUS_KEYWORD, MULTIPLY_KEYWORD
@@ -195,9 +195,99 @@ class TestTokenizerOperators:
         tokens = Tokenizer("*").tokenize()
         assert repr(tokens[0]) == "*"
 
-    def test_equals_repr(self):
+    def test_assign_repr(self):
         tokens = Tokenizer("=").tokenize()
         assert repr(tokens[0]) == "="
+
+    def test_minus(self):
+        from tokenizer.keywords import MINUS_KEYWORD
+        tokens = Tokenizer("-").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], MINUS_KEYWORD)
+
+    def test_minus_repr(self):
+        tokens = Tokenizer("-").tokenize()
+        assert repr(tokens[0]) == "-"
+
+    def test_int_division(self):
+        from tokenizer.keywords import INT_DIVISION_KEYWORD
+        tokens = Tokenizer("//").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], INT_DIVISION_KEYWORD)
+
+    def test_int_division_repr(self):
+        tokens = Tokenizer("//").tokenize()
+        assert repr(tokens[0]) == "//"
+
+    def test_modulo(self):
+        from tokenizer.keywords import MODULO_KEYWORD
+        tokens = Tokenizer("%").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], MODULO_KEYWORD)
+
+    def test_modulo_repr(self):
+        tokens = Tokenizer("%").tokenize()
+        assert repr(tokens[0]) == "%"
+
+    def test_subtraction_expression(self):
+        from tokenizer.keywords import MINUS_KEYWORD
+        tokens = Tokenizer("10 - 3").tokenize()
+        assert len(tokens) == 3
+        assert tokens[0].val == 10
+        assert isinstance(tokens[1], MINUS_KEYWORD)
+        assert tokens[2].val == 3
+
+    def test_int_division_expression(self):
+        from tokenizer.keywords import INT_DIVISION_KEYWORD
+        tokens = Tokenizer("10 // 3").tokenize()
+        assert len(tokens) == 3
+        assert tokens[0].val == 10
+        assert isinstance(tokens[1], INT_DIVISION_KEYWORD)
+        assert tokens[2].val == 3
+
+    def test_modulo_expression(self):
+        from tokenizer.keywords import MODULO_KEYWORD
+        tokens = Tokenizer("10 % 3").tokenize()
+        assert len(tokens) == 3
+        assert tokens[0].val == 10
+        assert isinstance(tokens[1], MODULO_KEYWORD)
+        assert tokens[2].val == 3
+
+
+class TestTokenizerLetStatement:
+    def test_let_keyword(self):
+        from tokenizer.keywords import LET_KEYWORD
+        tokens = Tokenizer("let").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], LET_KEYWORD)
+
+    def test_let_keyword_repr(self):
+        tokens = Tokenizer("let").tokenize()
+        assert repr(tokens[0]) == "let"
+
+    def test_let_statement(self):
+        from tokenizer.keywords import ASSIGN_KEYWORD, LET_KEYWORD
+        tokens = Tokenizer("let x = 5;").tokenize()
+        assert len(tokens) == 5
+        assert isinstance(tokens[0], LET_KEYWORD)
+        assert isinstance(tokens[1], IDENTIFIER)
+        assert tokens[1].val == "x"
+        assert isinstance(tokens[2], ASSIGN_KEYWORD)
+        assert isinstance(tokens[3], INT_LITERAL)
+        assert tokens[3].val == 5
+        assert isinstance(tokens[4], SEMICOLON)
+
+    def test_let_with_expression(self):
+        from tokenizer.keywords import LET_KEYWORD, ASSIGN_KEYWORD, PLUS_KEYWORD
+        tokens = Tokenizer("let y = 1 + 2;").tokenize()
+        assert len(tokens) == 7
+        assert isinstance(tokens[0], LET_KEYWORD)
+        assert isinstance(tokens[1], IDENTIFIER)
+        assert isinstance(tokens[2], ASSIGN_KEYWORD)
+        assert isinstance(tokens[3], INT_LITERAL)
+        assert isinstance(tokens[4], PLUS_KEYWORD)
+        assert isinstance(tokens[5], INT_LITERAL)
+        assert isinstance(tokens[6], SEMICOLON)
 
 
 class TestTokenizerRepr:

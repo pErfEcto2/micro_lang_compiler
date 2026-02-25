@@ -1,5 +1,6 @@
 from parser.ast_node import ASTNode
 from tokenizer.keywords import MATH_OPERATION
+from tokenizer.tokens import IDENTIFIER
 
 
 class EXPRESSION(ASTNode):
@@ -38,6 +39,17 @@ class BINARY_EXPRESSION(EXPRESSION):
 
     def __str__(self) -> str:
         return f"{self.lval} {self.op} {self.rval}"
+
+    def __repr__(self) -> str:
+        return str(self)
+
+class IDENTIFIER_EXPRESSION(EXPRESSION):
+    def __init__(self, line_number: int, identifier: str) -> None:
+        super().__init__(line_number)
+        self.name: str = identifier
+
+    def __str__(self) -> str:
+        return f"{self.name}"
 
     def __repr__(self) -> str:
         return str(self)

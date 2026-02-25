@@ -1,9 +1,9 @@
 import pytest
 from parser.parser import Parser
 from parser.program import PROGRAM
-from parser.statements import EXIT_STATEMENT
-from parser.expressions import BINARY_EXPRESSION, INT_EXPRESSION, STR_EXPRESSION
-from tokenizer.keywords import EXIT_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD, SEMICOLON
+from parser.statements import EXIT_STATEMENT, LET_STATEMENT
+from parser.expressions import BINARY_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, STR_EXPRESSION
+from tokenizer.keywords import ASSIGN_KEYWORD, EXIT_KEYWORD, LET_KEYWORD, MINUS_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD, SEMICOLON
 from tokenizer.literals import INT_LITERAL, STR_LITERAL
 from tokenizer.tokens import IDENTIFIER
 
@@ -121,18 +121,20 @@ class TestParserErrors:
         with pytest.raises(ValueError, match="unexpected expression"):
             Parser(tokens).parse()
 
-    def test_unexpected_expression_identifier(self):
+    def test_identifier_expression_now_valid(self):
         tokens = [EXIT_KEYWORD(1), IDENTIFIER(1, "x"), SEMICOLON(1)]
-        with pytest.raises(ValueError, match="unexpected expression"):
-            Parser(tokens).parse()
+        program = Parser(tokens).parse()
+        expr = program.statements[0].return_code
+        assert isinstance(expr, IDENTIFIER_EXPRESSION)
+        assert expr.name == "x"
 
     def test_error_reports_line_number(self):
         tokens = [IDENTIFIER(7, "badtoken")]
         with pytest.raises(ValueError, match="line 7"):
             Parser(tokens).parse()
 
-    def test_expression_error_reports_line_number(self):
-        tokens = [EXIT_KEYWORD(3), IDENTIFIER(3, "x"), SEMICOLON(3)]
+    def test_exit_with_str_expression_error_reports_line(self):
+        tokens = [EXIT_KEYWORD(3), STR_LITERAL(3, "x"), SEMICOLON(3)]
         with pytest.raises(ValueError, match="line 3"):
             Parser(tokens).parse()
 
@@ -219,6 +221,105 @@ class TestParserIntegration:
         expr = program.statements[0].return_code
         assert isinstance(expr, BINARY_EXPRESSION)
 
+    def test_full_pipeline_let_statement(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("let x = 5;").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        assert isinstance(program.statements[0], LET_STATEMENT)
+
+    def test_full_pipeline_let_and_exit(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("let x = 5;\nexit x;").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 2
+        assert isinstance(program.statements[0], LET_STATEMENT)
+        assert isinstance(program.statements[1], EXIT_STATEMENT)
+
+    def test_full_pipeline_subtraction(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("exit 10 - 3;").tokenize()
+        program = Parser(tokens).parse()
+        expr = program.statements[0].return_code
+        assert isinstance(expr, BINARY_EXPRESSION)
+
+
+class TestParserLetStatement:
+    def test_simple_let(self):
+        tokens = [
+            LET_KEYWORD(1), IDENTIFIER(1, "x"), ASSIGN_KEYWORD(1),
+            INT_LITERAL(1, 5), SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, LET_STATEMENT)
+        assert stmt.identifier.name == "x"
+        assert isinstance(stmt.expr, INT_EXPRESSION)
+        assert stmt.expr.val == 5
+
+    def test_let_with_expression(self):
+        tokens = [
+            LET_KEYWORD(1), IDENTIFIER(1, "y"), ASSIGN_KEYWORD(1),
+            INT_LITERAL(1, 1), PLUS_KEYWORD(1), INT_LITERAL(1, 2), SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, LET_STATEMENT)
+        assert isinstance(stmt.expr, BINARY_EXPRESSION)
+
+    def test_let_missing_identifier(self):
+        tokens = [LET_KEYWORD(1), INT_LITERAL(1, 5), ASSIGN_KEYWORD(1), INT_LITERAL(1, 5), SEMICOLON(1)]
+        with pytest.raises(ValueError, match="expected"):
+            Parser(tokens).parse()
+
+    def test_let_missing_assign(self):
+        tokens = [LET_KEYWORD(1), IDENTIFIER(1, "x"), INT_LITERAL(1, 5), SEMICOLON(1)]
+        with pytest.raises(ValueError, match="expected"):
+            Parser(tokens).parse()
+
+    def test_let_missing_semicolon(self):
+        tokens = [LET_KEYWORD(1), IDENTIFIER(1, "x"), ASSIGN_KEYWORD(1), INT_LITERAL(1, 5)]
+        with pytest.raises(ValueError, match="expected"):
+            Parser(tokens).parse()
+
+    def test_let_repr(self):
+        stmt = LET_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5))
+        assert "LET_STATEMENT" in repr(stmt)
+        assert "x" in repr(stmt)
+
+    def test_let_preserves_line_number(self):
+        tokens = [
+            LET_KEYWORD(3), IDENTIFIER(3, "z"), ASSIGN_KEYWORD(3),
+            INT_LITERAL(3, 10), SEMICOLON(3),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert stmt.line_number == 3
+
+
+class TestParserIdentifierExpression:
+    def test_exit_with_identifier(self):
+        tokens = [EXIT_KEYWORD(1), IDENTIFIER(1, "x"), SEMICOLON(1)]
+        program = Parser(tokens).parse()
+        expr = program.statements[0].return_code
+        assert isinstance(expr, IDENTIFIER_EXPRESSION)
+        assert expr.name == "x"
+
+    def test_identifier_in_binary_expr(self):
+        tokens = [
+            EXIT_KEYWORD(1), IDENTIFIER(1, "a"), PLUS_KEYWORD(1), INT_LITERAL(1, 1), SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        expr = program.statements[0].return_code
+        assert isinstance(expr, BINARY_EXPRESSION)
+        assert isinstance(expr.lval, IDENTIFIER_EXPRESSION)
+        assert expr.lval.name == "a"
+
+    def test_identifier_expression_repr(self):
+        expr = IDENTIFIER_EXPRESSION(1, "foo")
+        assert repr(expr) == "foo"
+
 
 class TestParserBinaryExpressions:
     def test_simple_addition(self):
@@ -237,6 +338,14 @@ class TestParserBinaryExpressions:
         assert expr.lval.val == 3
         assert expr.rval.val == 4
 
+    def test_simple_subtraction(self):
+        tokens = [EXIT_KEYWORD(1), INT_LITERAL(1, 10), MINUS_KEYWORD(1), INT_LITERAL(1, 3), SEMICOLON(1)]
+        program = Parser(tokens).parse()
+        expr = program.statements[0].return_code
+        assert isinstance(expr, BINARY_EXPRESSION)
+        assert expr.lval.val == 10
+        assert expr.rval.val == 3
+
     def test_multiply_binds_tighter_than_add(self):
         # 1 + 2 * 3 → BINARY(1, +, BINARY(2, *, 3))
         tokens = [
@@ -252,6 +361,22 @@ class TestParserBinaryExpressions:
         assert isinstance(expr.rval, BINARY_EXPRESSION)
         assert expr.rval.lval.val == 2
         assert expr.rval.rval.val == 3
+
+    def test_subtract_same_precedence_as_add(self):
+        # 5 - 3 + 1 → BINARY(5, -, BINARY(3, +, 1)) (right-associative with min_bp + 1)
+        tokens = [
+            EXIT_KEYWORD(1),
+            INT_LITERAL(1, 5), MINUS_KEYWORD(1), INT_LITERAL(1, 3), PLUS_KEYWORD(1), INT_LITERAL(1, 1),
+            SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        expr = program.statements[0].return_code
+        assert isinstance(expr, BINARY_EXPRESSION)
+        assert isinstance(expr.lval, INT_EXPRESSION)
+        assert expr.lval.val == 5
+        assert isinstance(expr.rval, BINARY_EXPRESSION)
+        assert expr.rval.lval.val == 3
+        assert expr.rval.rval.val == 1
 
     def test_binary_expression_repr(self):
         expr = BINARY_EXPRESSION(1, INT_EXPRESSION(1, 10), PLUS_KEYWORD(1), INT_EXPRESSION(1, 20))
