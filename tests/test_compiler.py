@@ -1,7 +1,7 @@
 import pytest
 from compiler.compiler import Compiler
 from parser.program import PROGRAM
-from parser.statements import EXIT_STATEMENT, LET_STATEMENT, STATEMENT
+from parser.statements import ASSIGN_STATEMENT, EXIT_STATEMENT, LET_STATEMENT, PRINT_STATEMENT, STATEMENT
 from parser.expressions import BINARY_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, STR_EXPRESSION
 from tokenizer.keywords import INT_DIVISION_KEYWORD, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD
 
@@ -13,17 +13,21 @@ def _make_program(*statements):
 
 
 class TestCompilerPrefix:
-    def test_has_global_start(self):
+    def test_has_global_main(self):
         result = Compiler(_make_program()).compile()
-        assert "global _start" in result
+        assert "global main" in result
 
     def test_has_text_section(self):
         result = Compiler(_make_program()).compile()
         assert "section .text" in result
 
-    def test_has_start_label(self):
+    def test_has_data_section(self):
         result = Compiler(_make_program()).compile()
-        assert "_start:" in result
+        assert "section .data" in result
+
+    def test_has_main_label(self):
+        result = Compiler(_make_program()).compile()
+        assert "main:" in result
 
     def test_has_stack_frame_setup(self):
         result = Compiler(_make_program()).compile()
@@ -33,11 +37,13 @@ class TestCompilerPrefix:
     def test_prefix_order(self):
         result = Compiler(_make_program()).compile()
         lines = result.split("\n")
-        assert lines[0] == "global _start"
-        assert lines[1] == "section .text"
-        assert lines[2] == "_start:"
-        assert lines[3] == "    push rbp"
-        assert lines[4] == "    mov rbp, rsp"
+        assert lines[0] == "section .data"
+        assert lines[1] == '    int_fmt_str db "%d", 10, 0'
+        assert lines[2] == "section .text"
+        assert lines[3] == "global main"
+        assert lines[4] == "main:"
+        assert lines[5] == "    push rbp"
+        assert lines[6] == "    mov rbp, rsp"
 
 
 class TestCompilerSuffix:
@@ -111,16 +117,16 @@ class TestCompilerFullOutput:
     def test_empty_program(self):
         result = Compiler(_make_program()).compile()
         expected = "\n".join([
-            "global _start",
+            "section .data",
+            '    int_fmt_str db "%d", 10, 0',
             "section .text",
-            "_start:",
+            "global main",
+            "main:",
             "    push rbp",
             "    mov rbp, rsp",
             "    mov rax, 60",
             "    mov rdi, 0",
             "    syscall",
-            "",
-            "",
         ])
         assert result == expected
 
@@ -128,9 +134,11 @@ class TestCompilerFullOutput:
         prog = _make_program(EXIT_STATEMENT(1, INT_EXPRESSION(1, 42)))
         result = Compiler(prog).compile()
         expected = "\n".join([
-            "global _start",
+            "section .data",
+            '    int_fmt_str db "%d", 10, 0',
             "section .text",
-            "_start:",
+            "global main",
+            "main:",
             "    push rbp",
             "    mov rbp, rsp",
             "    push 42",
@@ -140,49 +148,55 @@ class TestCompilerFullOutput:
             "    mov rax, 60",
             "    mov rdi, 0",
             "    syscall",
-            "",
-            "",
         ])
         assert result == expected
 
 
 class TestCompilerHelpers:
     def test_push(self):
-        prog = _make_program()
-        c = Compiler(prog)
+        c = Compiler(_make_program())
         c._push("rax")
-        assert "    push rax" in c._asm_output
+        assert "    push rax" in c._text_s
 
     def test_pop(self):
-        prog = _make_program()
-        c = Compiler(prog)
+        c = Compiler(_make_program())
         c._pop("rbx")
-        assert "    pop rbx" in c._asm_output
+        assert "    pop rbx" in c._text_s
 
     def test_add(self):
         c = Compiler(_make_program())
         c._add("rax", "rbx")
-        assert "    add rax, rbx" in c._asm_output
+        assert "    add rax, rbx" in c._text_s
 
     def test_imul(self):
         c = Compiler(_make_program())
         c._imul("rax", "rbx")
-        assert "    imul rax, rbx" in c._asm_output
+        assert "    imul rax, rbx" in c._text_s
 
     def test_sub(self):
         c = Compiler(_make_program())
         c._sub("rax", "rbx")
-        assert "    sub rax, rbx" in c._asm_output
+        assert "    sub rax, rbx" in c._text_s
 
     def test_idiv(self):
         c = Compiler(_make_program())
         c._idiv("rbx")
-        assert "    idiv rbx" in c._asm_output
+        assert "    idiv rbx" in c._text_s
 
     def test_cqo(self):
         c = Compiler(_make_program())
         c._cqo()
-        assert "    cqo" in c._asm_output
+        assert "    cqo" in c._text_s
+
+    def test_lea(self):
+        c = Compiler(_make_program())
+        c._lea("rdi", "[int_fmt_str]")
+        assert "    lea rdi, [int_fmt_str]" in c._text_s
+
+    def test_call(self):
+        c = Compiler(_make_program())
+        c._call("printf")
+        assert "    call printf" in c._text_s
 
 
 class TestCompilerErrors:
@@ -302,7 +316,7 @@ class TestCompilerIntegration:
         tokens = Tokenizer("exit 69;").tokenize()
         prog = Parser(tokens).parse()
         result = Compiler(prog).compile()
-        assert "global _start" in result
+        assert "global main" in result
         assert "push 69" in result
         assert "pop rdi" in result
         assert "syscall" in result
@@ -324,7 +338,7 @@ class TestCompilerIntegration:
         tokens = Tokenizer("").tokenize()
         prog = Parser(tokens).parse()
         result = Compiler(prog).compile()
-        assert "global _start" in result
+        assert "global main" in result
         assert "    mov rax, 60" in result
 
     def test_full_pipeline_arithmetic(self):
@@ -367,3 +381,82 @@ class TestCompilerIntegration:
         assert "    imul rax, rbx" in result
         assert "    add rax, rbx" in result
         assert "    pop rdi" in result
+
+    def test_full_pipeline_print(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("print 42;").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "extern printf" in result
+        assert "    call printf" in result
+
+    def test_full_pipeline_assign(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("let x = 1;\nx = 10;").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    mov qword [rbp - 8], rax" in result
+
+
+class TestCompilerPrintStatement:
+    def test_print_int(self):
+        prog = _make_program(PRINT_STATEMENT(1, INT_EXPRESSION(1, 42)))
+        result = Compiler(prog).compile()
+        assert "extern printf" in result
+        assert "    push 42" in result
+        assert "    pop rsi" in result
+        assert '    lea rdi, [int_fmt_str]' in result
+        assert "    mov rax, 0" in result
+        assert "    call printf" in result
+
+    def test_print_var(self):
+        prog = _make_program(
+            LET_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5)),
+            PRINT_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "x")),
+        )
+        result = Compiler(prog).compile()
+        assert "extern printf" in result
+        assert "    call printf" in result
+
+    def test_print_expression(self):
+        expr = BINARY_EXPRESSION(1, INT_EXPRESSION(1, 10), PLUS_KEYWORD(1), INT_EXPRESSION(1, 20))
+        prog = _make_program(PRINT_STATEMENT(1, expr))
+        result = Compiler(prog).compile()
+        assert "    add rax, rbx" in result
+        assert "    pop rsi" in result
+        assert "    call printf" in result
+
+    def test_no_extern_without_print(self):
+        prog = _make_program(EXIT_STATEMENT(1, INT_EXPRESSION(1, 0)))
+        result = Compiler(prog).compile()
+        assert "extern" not in result
+
+
+class TestCompilerAssignStatement:
+    def test_simple_assign(self):
+        prog = _make_program(
+            LET_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5)),
+            ASSIGN_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "x"), INT_EXPRESSION(2, 10)),
+        )
+        result = Compiler(prog).compile()
+        assert result.count("    mov qword [rbp - 8], rax") == 2
+
+    def test_assign_with_expression(self):
+        expr = BINARY_EXPRESSION(2, IDENTIFIER_EXPRESSION(2, "x"), PLUS_KEYWORD(2), INT_EXPRESSION(2, 1))
+        prog = _make_program(
+            LET_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5)),
+            ASSIGN_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "x"), expr),
+        )
+        result = Compiler(prog).compile()
+        assert "    add rax, rbx" in result
+
+    def test_assign_unknown_var_raises(self):
+        prog = _make_program(
+            ASSIGN_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "y"), INT_EXPRESSION(1, 1)),
+        )
+        with pytest.raises(ValueError, match="unknown identifier"):
+            Compiler(prog).compile()

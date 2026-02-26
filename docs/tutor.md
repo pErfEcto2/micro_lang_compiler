@@ -22,6 +22,27 @@ let a = 60 + 2 * 4;
 let b = a + 1;
 ```
 
+### Reassignment
+
+Variables can be reassigned with `=`:
+
+```
+let x = 5;
+x = 10;
+x = x + 1;
+```
+
+### Print
+
+Print an integer value to the console using `print`:
+
+```
+print 42;
+let x = 10;
+print x;
+print x + 1;
+```
+
 ### Exit
 
 Exit the program with a return code using `exit`:

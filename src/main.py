@@ -78,9 +78,9 @@ if args.no_linker:
     print(f"created: {obj_path}")
     exit(0)
 
-result = subprocess.run(["ld", obj_path, "-o", output_file_path])
+result = subprocess.run(["gcc", obj_path, "-o", output_file_path, "-no-pie"])
 if result.returncode != 0:
-    print("ld failed")
+    print("linker failed")
     exit(1)
 
 os.remove(asm_path)

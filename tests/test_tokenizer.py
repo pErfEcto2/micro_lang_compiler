@@ -290,6 +290,37 @@ class TestTokenizerLetStatement:
         assert isinstance(tokens[6], SEMICOLON)
 
 
+class TestTokenizerPrintKeyword:
+    def test_print_keyword(self):
+        from tokenizer.keywords import PRINT_KEYWORD
+        tokens = Tokenizer("print").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], PRINT_KEYWORD)
+
+    def test_print_keyword_repr(self):
+        tokens = Tokenizer("print").tokenize()
+        assert repr(tokens[0]) == "print"
+
+    def test_print_statement_tokens(self):
+        from tokenizer.keywords import PRINT_KEYWORD
+        tokens = Tokenizer("print 42;").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], PRINT_KEYWORD)
+        assert isinstance(tokens[1], INT_LITERAL)
+        assert tokens[1].val == 42
+        assert isinstance(tokens[2], SEMICOLON)
+
+    def test_print_with_expression(self):
+        from tokenizer.keywords import PRINT_KEYWORD, PLUS_KEYWORD
+        tokens = Tokenizer("print 1 + 2;").tokenize()
+        assert len(tokens) == 5
+        assert isinstance(tokens[0], PRINT_KEYWORD)
+        assert isinstance(tokens[1], INT_LITERAL)
+        assert isinstance(tokens[2], PLUS_KEYWORD)
+        assert isinstance(tokens[3], INT_LITERAL)
+        assert isinstance(tokens[4], SEMICOLON)
+
+
 class TestTokenizerRepr:
     def test_exit_keyword_repr(self):
         tokens = Tokenizer("exit").tokenize()

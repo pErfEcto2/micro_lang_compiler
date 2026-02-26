@@ -1,22 +1,22 @@
 # Micro Lang Compiler
 
-A compiler for a minimal programming language that compiles to x86 assembly (NASM) and links with `ld`.
+A compiler for a minimal programming language that compiles to x86 assembly (NASM) and links with `gcc`.
 
 ## Language Features
 
+- `let` — declare Int32 variables
+- `=` — reassign variables
+- `print` — print Int32 to console
 - `exit` — exit with a return code
-- Arithmetic expressions: `+`, `*` 
-- `let` — declare Int32 variables *(planned)*
-- `print` — print Int32 to console *(planned)*
+- Arithmetic expressions: `+`, `-`, `*`, `//`, `%`
 - `if/else` — branching *(planned)*
 - `while` — loops *(planned)*
-- More arithmetic: `-`, `/`, `%` *(planned)*
 - Comparison: `>`, `<`, `>=`, `<=`, `==`, `!=` *(planned)*
 
 ## Pipeline
 
 ```
-Source (.mil) → Tokenizer → Parser → Compiler → NASM → ld → Executable
+Source (.mil) → Tokenizer → Parser → Compiler → NASM → gcc → Executable
 ```
 
 ## Usage
@@ -32,7 +32,10 @@ python src/main.py -v <source.mil>   # verbose: show tokens, AST and assembly
 ## Example
 
 ```
-exit 10 + 2 * 4 + 1;
+let x = 10 + 2 * 4;
+x = x + 1;
+print x;
+exit 0;
 ```
 
 ## Development

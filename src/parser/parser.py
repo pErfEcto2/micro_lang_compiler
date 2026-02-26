@@ -1,7 +1,7 @@
-from parser.statements import EXIT_STATEMENT, LET_STATEMENT
+from parser.statements import ASSIGN_STATEMENT, EXIT_STATEMENT, LET_STATEMENT, PRINT_STATEMENT
 from parser.program import PROGRAM
 from parser.expressions import BINARY_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION
-from tokenizer.keywords import ASSIGN_KEYWORD, EXIT_KEYWORD, LET_KEYWORD, MATH_OPERATION, SEMICOLON
+from tokenizer.keywords import ASSIGN_KEYWORD, EXIT_KEYWORD, LET_KEYWORD, MATH_OPERATION, PRINT_KEYWORD, SEMICOLON
 from tokenizer.literals import INT_LITERAL
 from tokenizer.tokens import IDENTIFIER, Token
 
@@ -75,17 +75,35 @@ class Parser:
         self._assert_current_token_type(SEMICOLON)
         return LET_STATEMENT(expr.line_number, identiefier, expr)
 
+    def _parse_print_statement(self) -> PRINT_STATEMENT:
+        expr = self._parse_expr(self._consume())
+        self._assert_current_token_type(SEMICOLON)
+        return PRINT_STATEMENT(expr.line_number, expr)
+
+    def _parse_assign_statement(self, ln: int, name: str) -> ASSIGN_STATEMENT:
+        self._assert_current_token_type(ASSIGN_KEYWORD)
+        self._consume()
+        identifier = IDENTIFIER_EXPRESSION(ln, name)
+        expr = self._parse_expr(self._consume())
+        return ASSIGN_STATEMENT(expr.line_number, identifier, expr)
+
     def parse(self) -> PROGRAM:
         program: PROGRAM = PROGRAM()
         while self._peek():
             token: Token = self._consume()
             match token:
+                case IDENTIFIER():
+                    assign_statemnt = self._parse_assign_statement(token.line_number, token.val)
+                    program.statements.append(assign_statemnt)
                 case EXIT_KEYWORD():
                     exit_statement = self._parse_exit_statement()
                     program.statements.append(exit_statement)
                 case LET_KEYWORD():
                     let_statement = self._parse_let_statement()
                     program.statements.append(let_statement)
+                case PRINT_KEYWORD():
+                    print_statement = self._parse_print_statement()
+                    program.statements.append(print_statement)
                 case SEMICOLON():
                     continue
                 case _:

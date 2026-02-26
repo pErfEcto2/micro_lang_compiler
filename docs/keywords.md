@@ -6,10 +6,10 @@
 |---------|-------------|
 | `let` | Declare a variable |
 | `exit` | Exit a program with given return code |
-| `print` | Print int32 to the console *(not implemented)* |
+| `print` | Print int32 to the console |
 | `if/else` | Branching *(not implemented)* |
 | `while` | Loop *(not implemented)* |
-| `=` | Assign *(not implemented)* |
+| `=` | Assign |
 
 ## Math operators
 

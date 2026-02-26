@@ -1,9 +1,9 @@
 import pytest
 from parser.parser import Parser
 from parser.program import PROGRAM
-from parser.statements import EXIT_STATEMENT, LET_STATEMENT
+from parser.statements import ASSIGN_STATEMENT, EXIT_STATEMENT, LET_STATEMENT, PRINT_STATEMENT
 from parser.expressions import BINARY_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, STR_EXPRESSION
-from tokenizer.keywords import ASSIGN_KEYWORD, EXIT_KEYWORD, LET_KEYWORD, MINUS_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD, SEMICOLON
+from tokenizer.keywords import ASSIGN_KEYWORD, EXIT_KEYWORD, LET_KEYWORD, MINUS_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON
 from tokenizer.literals import INT_LITERAL, STR_LITERAL
 from tokenizer.tokens import IDENTIFIER
 
@@ -96,9 +96,9 @@ class TestParserMultipleStatements:
 
 
 class TestParserErrors:
-    def test_unexpected_token_identifier(self):
-        tokens = [IDENTIFIER(1, "foo")]
-        with pytest.raises(ValueError, match="unexpected token"):
+    def test_identifier_without_assign_raises(self):
+        tokens = [IDENTIFIER(1, "foo"), SEMICOLON(1)]
+        with pytest.raises(ValueError, match="expected"):
             Parser(tokens).parse()
 
     def test_unexpected_token_int_literal(self):
@@ -129,7 +129,7 @@ class TestParserErrors:
         assert expr.name == "x"
 
     def test_error_reports_line_number(self):
-        tokens = [IDENTIFIER(7, "badtoken")]
+        tokens = [INT_LITERAL(7, 42)]
         with pytest.raises(ValueError, match="line 7"):
             Parser(tokens).parse()
 
@@ -207,10 +207,10 @@ class TestParserIntegration:
         program = Parser(tokens).parse()
         assert program.statements == []
 
-    def test_full_pipeline_identifier_fails(self):
+    def test_full_pipeline_identifier_without_assign_fails(self):
         from tokenizer.tokenizer import Tokenizer
         tokens = Tokenizer("foo;").tokenize()
-        with pytest.raises(ValueError, match="unexpected token"):
+        with pytest.raises(ValueError, match="expected"):
             Parser(tokens).parse()
 
     def test_full_pipeline_arithmetic(self):
@@ -381,3 +381,100 @@ class TestParserBinaryExpressions:
     def test_binary_expression_repr(self):
         expr = BINARY_EXPRESSION(1, INT_EXPRESSION(1, 10), PLUS_KEYWORD(1), INT_EXPRESSION(1, 20))
         assert repr(expr) == "10 + 20"
+
+
+class TestParserPrintStatement:
+    def test_simple_print(self):
+        tokens = [PRINT_KEYWORD(1), INT_LITERAL(1, 42), SEMICOLON(1)]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, PRINT_STATEMENT)
+        assert isinstance(stmt.expr, INT_EXPRESSION)
+        assert stmt.expr.val == 42
+
+    def test_print_identifier(self):
+        tokens = [PRINT_KEYWORD(1), IDENTIFIER(1, "x"), SEMICOLON(1)]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, PRINT_STATEMENT)
+        assert isinstance(stmt.expr, IDENTIFIER_EXPRESSION)
+        assert stmt.expr.name == "x"
+
+    def test_print_expression(self):
+        tokens = [
+            PRINT_KEYWORD(1), INT_LITERAL(1, 1), PLUS_KEYWORD(1), INT_LITERAL(1, 2), SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, PRINT_STATEMENT)
+        assert isinstance(stmt.expr, BINARY_EXPRESSION)
+
+    def test_print_missing_semicolon(self):
+        tokens = [PRINT_KEYWORD(1), INT_LITERAL(1, 42)]
+        with pytest.raises(ValueError, match="expected"):
+            Parser(tokens).parse()
+
+    def test_print_repr(self):
+        stmt = PRINT_STATEMENT(1, INT_EXPRESSION(1, 42))
+        assert "PRINT_STATEMENT" in repr(stmt)
+
+    def test_full_pipeline_print(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("print 42;").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        assert isinstance(program.statements[0], PRINT_STATEMENT)
+
+    def test_full_pipeline_let_and_print(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("let x = 5;\nprint x;").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 2
+        assert isinstance(program.statements[0], LET_STATEMENT)
+        assert isinstance(program.statements[1], PRINT_STATEMENT)
+
+
+class TestParserAssignStatement:
+    def test_simple_assign(self):
+        tokens = [
+            IDENTIFIER(1, "x"), ASSIGN_KEYWORD(1), INT_LITERAL(1, 10), SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, ASSIGN_STATEMENT)
+        assert stmt.identifier.name == "x"
+        assert isinstance(stmt.expr, INT_EXPRESSION)
+        assert stmt.expr.val == 10
+
+    def test_assign_with_expression(self):
+        tokens = [
+            IDENTIFIER(1, "x"), ASSIGN_KEYWORD(1),
+            INT_LITERAL(1, 1), PLUS_KEYWORD(1), INT_LITERAL(1, 2), SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, ASSIGN_STATEMENT)
+        assert isinstance(stmt.expr, BINARY_EXPRESSION)
+
+    def test_assign_repr(self):
+        stmt = ASSIGN_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5))
+        assert "ASSIGN_STATEMENT" in repr(stmt)
+        assert "x" in repr(stmt)
+
+    def test_full_pipeline_assign(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("x = 10;").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        assert isinstance(program.statements[0], ASSIGN_STATEMENT)
+
+    def test_full_pipeline_let_assign_exit(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("let x = 1;\nx = 10;\nexit x;").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 3
+        assert isinstance(program.statements[0], LET_STATEMENT)
+        assert isinstance(program.statements[1], ASSIGN_STATEMENT)
+        assert isinstance(program.statements[2], EXIT_STATEMENT)

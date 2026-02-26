@@ -47,6 +47,17 @@ class LET_KEYWORD(KEYWORD):
     def __repr__(self) -> str:
         return str(self)
 
+@register_keyword("print")
+class PRINT_KEYWORD(KEYWORD):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+
+    def __str__(self) -> str:
+        return "print"
+
+    def __repr__(self) -> str:
+        return str(self)
+
 @register_keyword("=")
 class ASSIGN_KEYWORD(KEYWORD):
     def __init__(self, line_num: int) -> None:

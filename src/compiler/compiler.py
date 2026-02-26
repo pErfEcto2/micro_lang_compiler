@@ -1,13 +1,16 @@
 from parser.expressions import BINARY_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION
 from parser.program import PROGRAM
-from parser.statements import EXIT_STATEMENT, LET_STATEMENT
+from parser.statements import ASSIGN_STATEMENT, EXIT_STATEMENT, LET_STATEMENT, PRINT_STATEMENT
 from tokenizer.keywords import INT_DIVISION_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD
 
 
 class Compiler:
     def __init__(self, prog: PROGRAM) -> None:
         self._ast: PROGRAM = prog
-        self._asm_output: list[str] = []
+        self._text_s: list[str] = []
+        self._data_s: set[str] = set()
+        self._externs: set[str] = set()
+        self._asm: list[str] = []
         self._vars: dict[str, int] = {}
         self._num_of_vars: int = 0
         self._qword_size: int = 8
@@ -17,44 +20,67 @@ class Compiler:
         return self._qword_size * self._vars[var]
 
     def _push(self, var: str) -> None:
-        self._asm_output.append(f"    push {var}")
+        self._text_s.append(f"    push {var}")
 
     def _mov(self, lval: str, rval: str) -> None:
-        self._asm_output.append(f"    mov {lval}, {rval}")
+        self._text_s.append(f"    mov {lval}, {rval}")
+
+    def _gen_text_prefix(self) -> None:
+        self._asm.append("section .text")
+        self._asm.append("global main")
+        self._asm.append("main:")
+        self._asm.append("    push rbp")
+        self._asm.append("    mov rbp, rsp")
+
+    def _gen_externs(self) -> None:
+        for ex in self._externs:
+            self._asm.append(f"extern {ex}")
+
+    def _gen_data_s(self) -> None:
+        self._asm.append("section .data")
+        self._asm.append("    int_fmt_str db \"%d\", 10, 0")
+
+    def _gen_text_s(self) -> None:
+        for text in self._text_s:
+            self._asm.append(text)
 
     def _gen_prefix(self) -> None:
-        self._asm_output.append("global _start")
-        self._asm_output.append("section .text")
-        self._asm_output.append("_start:")
-        self._push("rbp")
-        self._mov("rbp", "rsp")
+        self._gen_externs()
+        self._gen_data_s()
+        self._gen_text_prefix()
+        self._gen_text_s()
 
     def _syscall(self) -> None:
-        self._asm_output.append("    syscall")
+        self._text_s.append("    syscall")
 
     def _gen_suffix(self) -> None:
         self._mov("rax", "60")
         self._mov("rdi", "0")
         self._syscall()
-        self._asm_output.append("\n")
 
     def _pop(self, var: str) -> None:
-        self._asm_output.append(f"    pop {var}")
+        self._text_s.append(f"    pop {var}")
 
     def _add(self, lval: str, rval: str) -> None:
-        self._asm_output.append(f"    add {lval}, {rval}")
+        self._text_s.append(f"    add {lval}, {rval}")
 
     def _imul(self, lval: str, rval: str) -> None:
-        self._asm_output.append(f"    imul {lval}, {rval}")
+        self._text_s.append(f"    imul {lval}, {rval}")
 
     def _idiv(self, divider: str) -> None:
-        self._asm_output.append(f"    idiv {divider}")
+        self._text_s.append(f"    idiv {divider}")
 
     def _sub(self, lval: str, rval: str) -> None:
-        self._asm_output.append(f"    sub {lval}, {rval}")
+        self._text_s.append(f"    sub {lval}, {rval}")
+
+    def _lea(self, lval: str, rval: str) -> None:
+        self._text_s.append(f"    lea {lval}, {rval}")
 
     def _cqo(self) -> None:
-        self._asm_output.append("    cqo")
+        self._text_s.append("    cqo")
+
+    def _call(self, f: str) -> None:
+        self._text_s.append(f"    call {f}")
 
     def _eval_expr(self, expr: EXPRESSION) -> None:
         match expr:
@@ -117,9 +143,24 @@ class Compiler:
         self._pop("rax")
         self._mov(f"qword [rbp - {stack_offset}]", "rax")
 
-    def compile(self) -> str:
-        self._gen_prefix()
+    def _gen_print(self, expr: EXPRESSION) -> None:
+        self._externs.add("printf")
+        self._eval_expr(expr)
+        self._pop("rsi")
+        self._lea("rdi", "[int_fmt_str]")
+        self._mov("rax", "0")
+        self._call("printf")
 
+    def _gen_assing(self, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION) -> None:
+        if identifier.name not in self._vars:
+            raise ValueError(f"unknown identifier '{identifier.name}' in line {identifier.line_number}")
+
+        self._eval_expr(expr)
+        self._pop("rax")
+        stack_offset = self._get_stack_offset(identifier.name)
+        self._mov(f"qword [rbp - {stack_offset}]", "rax")
+
+    def compile(self) -> str:
         for statement in self._ast.statements:
             match statement:
                 case EXIT_STATEMENT():
@@ -127,11 +168,18 @@ class Compiler:
 
                 case LET_STATEMENT():
                     self._gen_let(statement.identifier, statement.expr)
+
+                case PRINT_STATEMENT():
+                    self._gen_print(statement.expr)
+
+                case ASSIGN_STATEMENT():
+                    self._gen_assing(statement.identifier, statement.expr)
                 
                 case _:
                     raise ValueError(f"unexpected statement '{statement}' in line {statement.line_number}")
 
         self._gen_suffix()
+        self._gen_prefix()
         
-        return "\n".join(self._asm_output) 
+        return "\n".join(self._asm) 
 

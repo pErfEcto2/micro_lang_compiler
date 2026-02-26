@@ -52,7 +52,7 @@ class TestMainNoNasm:
                 assert os.path.exists(asm_path)
                 with open(asm_path) as f:
                     content = f.read()
-                assert "global _start" in content
+                assert "global main" in content
                 assert "push 69" in content
                 assert "pop rdi" in content
         finally:
@@ -84,7 +84,7 @@ class TestMainNoNasm:
                 with open(out_path + ".asm") as f:
                     content = f.read()
                 assert "section .text" in content
-                assert "_start:" in content
+                assert "main:" in content
                 assert "push 42" in content
                 assert "pop rdi" in content
                 assert "syscall" in content
@@ -117,7 +117,7 @@ class TestMainCompiledOutput:
             with tempfile.TemporaryDirectory() as tmpdir:
                 out_path = os.path.join(tmpdir, "test_out")
                 result = run_compiler("-n", "-v", "-o", out_path, src_path)
-                assert "global _start" in result.stdout
+                assert "global main" in result.stdout
                 assert "push 1" in result.stdout
         finally:
             os.unlink(src_path)
@@ -131,7 +131,7 @@ class TestMainCompiledOutput:
             with tempfile.TemporaryDirectory() as tmpdir:
                 out_path = os.path.join(tmpdir, "test_out")
                 result = run_compiler("-n", "-o", out_path, src_path)
-                assert "global _start" not in result.stdout
+                assert "global main" not in result.stdout
         finally:
             os.unlink(src_path)
 
@@ -231,5 +231,55 @@ class TestMainSourceErrors:
                 out_path = os.path.join(tmpdir, "test_out")
                 result = run_compiler("-n", "-o", out_path, src_path)
                 assert result.returncode == 0
+        finally:
+            os.unlink(src_path)
+
+
+class TestMainPrintStatement:
+    def test_print_creates_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("print 42;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "extern printf" in content
+                assert "call printf" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_verbose_print_shows_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("print 42;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-v", "-o", out_path, src_path)
+                assert "call printf" in result.stdout
+        finally:
+            os.unlink(src_path)
+
+
+class TestMainAssignStatement:
+    def test_assign_creates_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("let x = 1;\nx = 10;\nexit x;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "qword [rbp - 8]" in content
         finally:
             os.unlink(src_path)
