@@ -150,10 +150,10 @@ class TestMainCompiledOutput:
             os.unlink(src_path)
 
 
-class TestMainLetStatement:
-    def test_let_and_exit_creates_asm(self):
+class TestMainInt64Statement:
+    def test_int64_and_exit_creates_asm(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
-            f.write("let x = 42;\nexit x;")
+            f.write("int64 x = 42;\nexit x;")
             src_path = f.name
 
         try:
@@ -168,9 +168,9 @@ class TestMainLetStatement:
         finally:
             os.unlink(src_path)
 
-    def test_let_with_arithmetic(self):
+    def test_int64_with_arithmetic(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
-            f.write("let a = 1 + 2;\nexit a;")
+            f.write("int64 a = 1 + 2;\nexit a;")
             src_path = f.name
 
         try:
@@ -184,9 +184,9 @@ class TestMainLetStatement:
         finally:
             os.unlink(src_path)
 
-    def test_verbose_let_shows_asm(self):
+    def test_verbose_int64_shows_asm(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
-            f.write("let x = 5;\nexit x;")
+            f.write("int64 x = 5;\nexit x;")
             src_path = f.name
 
         try:
@@ -267,10 +267,39 @@ class TestMainPrintStatement:
             os.unlink(src_path)
 
 
+class TestMainConstStatement:
+    def test_const_creates_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("const int64 x = 42;\nexit x;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "qword [rbp - 8]" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_const_reassign_fails(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("const int64 x = 1;\nx = 10;")
+            src_path = f.name
+
+        try:
+            result = run_compiler("-n", src_path)
+            assert result.returncode != 0
+        finally:
+            os.unlink(src_path)
+
+
 class TestMainAssignStatement:
     def test_assign_creates_asm(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
-            f.write("let x = 1;\nx = 10;\nexit x;")
+            f.write("int64 x = 1;\nx = 10;\nexit x;")
             src_path = f.name
 
         try:

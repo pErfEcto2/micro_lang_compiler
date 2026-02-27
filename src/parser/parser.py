@@ -1,7 +1,7 @@
-from parser.statements import ASSIGN_STATEMENT, EXIT_STATEMENT, LET_STATEMENT, PRINT_STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, INT64_STATEMENT, PRINT_STATEMENT
 from parser.program import PROGRAM
 from parser.expressions import BINARY_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION
-from tokenizer.keywords import ASSIGN_KEYWORD, EXIT_KEYWORD, LET_KEYWORD, MATH_OPERATION, PRINT_KEYWORD, SEMICOLON
+from tokenizer.keywords import ASSIGN_KEYWORD, CONST_KEYWORD, EXIT_KEYWORD, INT64_KEYWORD, MATH_OPERATION, PRINT_KEYWORD, SEMICOLON
 from tokenizer.literals import INT_LITERAL
 from tokenizer.tokens import IDENTIFIER, Token
 
@@ -65,7 +65,7 @@ class Parser:
         self._assert_current_token_type(SEMICOLON)
         return EXIT_STATEMENT(expr.line_number, expr)
 
-    def _parse_let_statement(self) -> LET_STATEMENT:
+    def _parse_int64_statement(self) -> INT64_STATEMENT:
         self._assert_current_token_type(IDENTIFIER)
         identiefier = self._consume()
         identiefier = IDENTIFIER_EXPRESSION(identiefier.line_number, identiefier.val)
@@ -73,7 +73,7 @@ class Parser:
         self._consume()
         expr = self._parse_expr(self._consume())
         self._assert_current_token_type(SEMICOLON)
-        return LET_STATEMENT(expr.line_number, identiefier, expr)
+        return INT64_STATEMENT(expr.line_number, identiefier, expr)
 
     def _parse_print_statement(self) -> PRINT_STATEMENT:
         expr = self._parse_expr(self._consume())
@@ -87,20 +87,27 @@ class Parser:
         expr = self._parse_expr(self._consume())
         return ASSIGN_STATEMENT(expr.line_number, identifier, expr)
 
+    def _parse_const_statement(self, ln: int) -> CONST_STATEMENT:
+        self._consume()
+        return CONST_STATEMENT(ln, self._parse_int64_statement())
+
     def parse(self) -> PROGRAM:
         program: PROGRAM = PROGRAM()
         while self._peek():
             token: Token = self._consume()
             match token:
+                case CONST_KEYWORD():
+                    const_statement = self._parse_const_statement(token.line_number)
+                    program.statements.append(const_statement)
                 case IDENTIFIER():
                     assign_statemnt = self._parse_assign_statement(token.line_number, token.val)
                     program.statements.append(assign_statemnt)
                 case EXIT_KEYWORD():
                     exit_statement = self._parse_exit_statement()
                     program.statements.append(exit_statement)
-                case LET_KEYWORD():
-                    let_statement = self._parse_let_statement()
-                    program.statements.append(let_statement)
+                case INT64_KEYWORD():
+                    int64_statement = self._parse_int64_statement()
+                    program.statements.append(int64_statement)
                 case PRINT_KEYWORD():
                     print_statement = self._parse_print_statement()
                     program.statements.append(print_statement)

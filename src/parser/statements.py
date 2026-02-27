@@ -1,11 +1,16 @@
 from parser.ast_node import ASTNode
 from parser.expressions import EXPRESSION, IDENTIFIER_EXPRESSION
-from tokenizer.tokens import IDENTIFIER
 
 
 class STATEMENT(ASTNode):
     def __init__(self, line_number: int) -> None:
         self.line_number: int = line_number
+
+    def __str__(self) -> str:
+        return f"STATEMENT(line: {self.line_number})"
+
+    def __repr__(self) -> str:
+        return str(self)
 
 class EXIT_STATEMENT(STATEMENT):
     def __init__(self, line_number: int, return_code: EXPRESSION) -> None:
@@ -15,20 +20,26 @@ class EXIT_STATEMENT(STATEMENT):
     def __str__(self) -> str:
         return f"EXIT_STATEMENT(ret: {self.return_code})"
 
-    def __repr__(self) -> str:
-        return str(self)
-
-class LET_STATEMENT(STATEMENT):
+class VARIABLE_TYPE(STATEMENT):
     def __init__(self, line_number: int, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION) -> None:
-        super().__init__(line_number)
+        self.line_number: int = line_number
         self.identifier: IDENTIFIER_EXPRESSION =  identifier
         self.expr: EXPRESSION = expr
 
-    def __str__(self) -> str:
-        return f"LET_STATEMENT(identifier: {self.identifier}, expr: {self.expr})"
+class CONST_STATEMENT(STATEMENT):
+    def __init__(self, line_number: int, var_statement: VARIABLE_TYPE) -> None:
+        super().__init__(line_number)
+        self.var_statement: VARIABLE_TYPE = var_statement
 
-    def __repr__(self) -> str:
-        return str(self)
+    def __str__(self) -> str:
+        return f"CONST_{self.var_statement}"
+
+class INT64_STATEMENT(VARIABLE_TYPE):
+    def __init__(self, line_number: int, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION) -> None:
+        super().__init__(line_number, identifier, expr)
+
+    def __str__(self) -> str:
+        return f"INT64_STATEMENT(identifier: {self.identifier}, expr: {self.expr})"
 
 class ASSIGN_STATEMENT(STATEMENT):
     def __init__(self, line_number: int, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION) -> None:
@@ -39,9 +50,6 @@ class ASSIGN_STATEMENT(STATEMENT):
     def __str__(self) -> str:
         return f"ASSIGN_STATEMENT(identifier: {self.identifier}, expr: {self.expr})"
 
-    def __repr__(self) -> str:
-        return str(self)
-
 class PRINT_STATEMENT(STATEMENT):
     def __init__(self, line_number: int, expr: EXPRESSION) -> None:
         super().__init__(line_number)
@@ -49,6 +57,3 @@ class PRINT_STATEMENT(STATEMENT):
 
     def __str__(self) -> str:
         return f"PRINT_STATEMENT(expr: {self.expr})"
-
-    def __repr__(self) -> str:
-        return str(self)

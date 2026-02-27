@@ -4,9 +4,10 @@ A compiler for a minimal programming language that compiles to x86 assembly (NAS
 
 ## Language Features
 
-- `let` — declare Int32 variables
+- `int64` — declare Int64 variables
+- `const` — declare constant (immutable) variables
 - `=` — reassign variables
-- `print` — print Int32 to console
+- `print` — print Int64 to console
 - `exit` — exit with a return code
 - Arithmetic expressions: `+`, `-`, `*`, `//`, `%`
 - `if/else` — branching *(planned)*
@@ -32,9 +33,13 @@ python src/main.py -v <source.mil>   # verbose: show tokens, AST and assembly
 ## Example
 
 ```
-let x = 10 + 2 * 4;
+int64 x = 10 + 2 * 4;
 x = x + 1;
 print x;
+
+const int64 y = 42;
+print y;
+
 exit 0;
 ```
 

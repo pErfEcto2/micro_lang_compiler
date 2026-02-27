@@ -1,7 +1,7 @@
 import pytest
 from compiler.compiler import Compiler
 from parser.program import PROGRAM
-from parser.statements import ASSIGN_STATEMENT, EXIT_STATEMENT, LET_STATEMENT, PRINT_STATEMENT, STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, INT64_STATEMENT, PRINT_STATEMENT, STATEMENT
 from parser.expressions import BINARY_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, STR_EXPRESSION
 from tokenizer.keywords import INT_DIVISION_KEYWORD, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD
 
@@ -262,10 +262,10 @@ class TestCompilerBinaryExpressions:
         assert "    add rax, rbx" in result
 
 
-class TestCompilerLetStatement:
-    def test_simple_let(self):
+class TestCompilerInt64Statement:
+    def test_simple_int64(self):
         prog = _make_program(
-            LET_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5))
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5))
         )
         result = Compiler(prog).compile()
         assert "    sub rsp, 8" in result
@@ -273,9 +273,9 @@ class TestCompilerLetStatement:
         assert "    pop rax" in result
         assert "    mov qword [rbp - 8], rax" in result
 
-    def test_let_and_exit_with_var(self):
+    def test_int64_and_exit_with_var(self):
         prog = _make_program(
-            LET_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 42)),
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 42)),
             EXIT_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "x")),
         )
         result = Compiler(prog).compile()
@@ -285,8 +285,8 @@ class TestCompilerLetStatement:
 
     def test_two_vars_different_offsets(self):
         prog = _make_program(
-            LET_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "a"), INT_EXPRESSION(1, 1)),
-            LET_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "b"), INT_EXPRESSION(2, 2)),
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "a"), INT_EXPRESSION(1, 1)),
+            INT64_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "b"), INT_EXPRESSION(2, 2)),
         )
         result = Compiler(prog).compile()
         assert "    mov qword [rbp - 8], rax" in result
@@ -294,8 +294,8 @@ class TestCompilerLetStatement:
 
     def test_duplicate_var_raises(self):
         prog = _make_program(
-            LET_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 1)),
-            LET_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "x"), INT_EXPRESSION(2, 2)),
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 1)),
+            INT64_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "x"), INT_EXPRESSION(2, 2)),
         )
         with pytest.raises(ValueError, match="already exists"):
             Compiler(prog).compile()
@@ -351,11 +351,11 @@ class TestCompilerIntegration:
         assert "    add rax, rbx" in result
         assert "    pop rdi" in result
 
-    def test_full_pipeline_let_and_exit(self):
+    def test_full_pipeline_int64_and_exit(self):
         from tokenizer.tokenizer import Tokenizer
         from parser.parser import Parser
 
-        tokens = Tokenizer("let x = 42;\nexit x;").tokenize()
+        tokens = Tokenizer("int64 x = 42;\nexit x;").tokenize()
         prog = Parser(tokens).parse()
         result = Compiler(prog).compile()
         assert "    mov qword [rbp - 8], rax" in result
@@ -371,11 +371,11 @@ class TestCompilerIntegration:
         result = Compiler(prog).compile()
         assert "    sub rax, rbx" in result
 
-    def test_full_pipeline_let_with_expression(self):
+    def test_full_pipeline_int64_with_expression(self):
         from tokenizer.tokenizer import Tokenizer
         from parser.parser import Parser
 
-        tokens = Tokenizer("let a = 60 + 2 * 4;\nexit a;").tokenize()
+        tokens = Tokenizer("int64 a = 60 + 2 * 4;\nexit a;").tokenize()
         prog = Parser(tokens).parse()
         result = Compiler(prog).compile()
         assert "    imul rax, rbx" in result
@@ -396,7 +396,7 @@ class TestCompilerIntegration:
         from tokenizer.tokenizer import Tokenizer
         from parser.parser import Parser
 
-        tokens = Tokenizer("let x = 1;\nx = 10;").tokenize()
+        tokens = Tokenizer("int64 x = 1;\nx = 10;").tokenize()
         prog = Parser(tokens).parse()
         result = Compiler(prog).compile()
         assert "    mov qword [rbp - 8], rax" in result
@@ -415,7 +415,7 @@ class TestCompilerPrintStatement:
 
     def test_print_var(self):
         prog = _make_program(
-            LET_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5)),
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5)),
             PRINT_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "x")),
         )
         result = Compiler(prog).compile()
@@ -439,7 +439,7 @@ class TestCompilerPrintStatement:
 class TestCompilerAssignStatement:
     def test_simple_assign(self):
         prog = _make_program(
-            LET_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5)),
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5)),
             ASSIGN_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "x"), INT_EXPRESSION(2, 10)),
         )
         result = Compiler(prog).compile()
@@ -448,7 +448,7 @@ class TestCompilerAssignStatement:
     def test_assign_with_expression(self):
         expr = BINARY_EXPRESSION(2, IDENTIFIER_EXPRESSION(2, "x"), PLUS_KEYWORD(2), INT_EXPRESSION(2, 1))
         prog = _make_program(
-            LET_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5)),
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5)),
             ASSIGN_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "x"), expr),
         )
         result = Compiler(prog).compile()
@@ -460,3 +460,62 @@ class TestCompilerAssignStatement:
         )
         with pytest.raises(ValueError, match="unknown identifier"):
             Compiler(prog).compile()
+
+
+class TestCompilerConstStatement:
+    def test_simple_const(self):
+        inner = INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5))
+        prog = _make_program(CONST_STATEMENT(1, inner))
+        result = Compiler(prog).compile()
+        assert "    sub rsp, 8" in result
+        assert "    push 5" in result
+        assert "    pop rax" in result
+        assert "    mov qword [rbp - 8], rax" in result
+
+    def test_const_used_in_expression(self):
+        inner = INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 42))
+        prog = _make_program(
+            CONST_STATEMENT(1, inner),
+            EXIT_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "x")),
+        )
+        result = Compiler(prog).compile()
+        assert "    mov rax, qword [rbp - 8]" in result
+        assert "    pop rdi" in result
+
+    def test_const_reassign_raises(self):
+        inner = INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5))
+        prog = _make_program(
+            CONST_STATEMENT(1, inner),
+            ASSIGN_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "x"), INT_EXPRESSION(2, 10)),
+        )
+        with pytest.raises(ValueError, match="cant change constant"):
+            Compiler(prog).compile()
+
+    def test_const_duplicate_raises(self):
+        inner1 = INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 1))
+        inner2 = INT64_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "x"), INT_EXPRESSION(2, 2))
+        prog = _make_program(
+            CONST_STATEMENT(1, inner1),
+            CONST_STATEMENT(2, inner2),
+        )
+        with pytest.raises(ValueError, match="already exists"):
+            Compiler(prog).compile()
+
+    def test_const_conflicts_with_var_raises(self):
+        inner = INT64_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "x"), INT_EXPRESSION(2, 2))
+        prog = _make_program(
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 1)),
+            CONST_STATEMENT(2, inner),
+        )
+        with pytest.raises(ValueError, match="already exists"):
+            Compiler(prog).compile()
+
+    def test_full_pipeline_const(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("const int64 x = 42;\nexit x;").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    mov qword [rbp - 8], rax" in result
+        assert "    pop rdi" in result

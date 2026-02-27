@@ -254,22 +254,22 @@ class TestTokenizerOperators:
         assert tokens[2].val == 3
 
 
-class TestTokenizerLetStatement:
-    def test_let_keyword(self):
-        from tokenizer.keywords import LET_KEYWORD
-        tokens = Tokenizer("let").tokenize()
+class TestTokenizerInt64Statement:
+    def test_int64_keyword(self):
+        from tokenizer.keywords import INT64_KEYWORD
+        tokens = Tokenizer("int64").tokenize()
         assert len(tokens) == 1
-        assert isinstance(tokens[0], LET_KEYWORD)
+        assert isinstance(tokens[0], INT64_KEYWORD)
 
-    def test_let_keyword_repr(self):
-        tokens = Tokenizer("let").tokenize()
-        assert repr(tokens[0]) == "let"
+    def test_int64_keyword_repr(self):
+        tokens = Tokenizer("int64").tokenize()
+        assert repr(tokens[0]) == "int64"
 
-    def test_let_statement(self):
-        from tokenizer.keywords import ASSIGN_KEYWORD, LET_KEYWORD
-        tokens = Tokenizer("let x = 5;").tokenize()
+    def test_int64_statement(self):
+        from tokenizer.keywords import ASSIGN_KEYWORD, INT64_KEYWORD
+        tokens = Tokenizer("int64 x = 5;").tokenize()
         assert len(tokens) == 5
-        assert isinstance(tokens[0], LET_KEYWORD)
+        assert isinstance(tokens[0], INT64_KEYWORD)
         assert isinstance(tokens[1], IDENTIFIER)
         assert tokens[1].val == "x"
         assert isinstance(tokens[2], ASSIGN_KEYWORD)
@@ -277,17 +277,42 @@ class TestTokenizerLetStatement:
         assert tokens[3].val == 5
         assert isinstance(tokens[4], SEMICOLON)
 
-    def test_let_with_expression(self):
-        from tokenizer.keywords import LET_KEYWORD, ASSIGN_KEYWORD, PLUS_KEYWORD
-        tokens = Tokenizer("let y = 1 + 2;").tokenize()
+    def test_int64_with_expression(self):
+        from tokenizer.keywords import INT64_KEYWORD, ASSIGN_KEYWORD, PLUS_KEYWORD
+        tokens = Tokenizer("int64 y = 1 + 2;").tokenize()
         assert len(tokens) == 7
-        assert isinstance(tokens[0], LET_KEYWORD)
+        assert isinstance(tokens[0], INT64_KEYWORD)
         assert isinstance(tokens[1], IDENTIFIER)
         assert isinstance(tokens[2], ASSIGN_KEYWORD)
         assert isinstance(tokens[3], INT_LITERAL)
         assert isinstance(tokens[4], PLUS_KEYWORD)
         assert isinstance(tokens[5], INT_LITERAL)
         assert isinstance(tokens[6], SEMICOLON)
+
+
+class TestTokenizerConstKeyword:
+    def test_const_keyword(self):
+        from tokenizer.keywords import CONST_KEYWORD
+        tokens = Tokenizer("const").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], CONST_KEYWORD)
+
+    def test_const_keyword_repr(self):
+        tokens = Tokenizer("const").tokenize()
+        assert repr(tokens[0]) == "const"
+
+    def test_const_int64_statement(self):
+        from tokenizer.keywords import CONST_KEYWORD, INT64_KEYWORD, ASSIGN_KEYWORD
+        tokens = Tokenizer("const int64 x = 5;").tokenize()
+        assert len(tokens) == 6
+        assert isinstance(tokens[0], CONST_KEYWORD)
+        assert isinstance(tokens[1], INT64_KEYWORD)
+        assert isinstance(tokens[2], IDENTIFIER)
+        assert tokens[2].val == "x"
+        assert isinstance(tokens[3], ASSIGN_KEYWORD)
+        assert isinstance(tokens[4], INT_LITERAL)
+        assert tokens[4].val == 5
+        assert isinstance(tokens[5], SEMICOLON)
 
 
 class TestTokenizerPrintKeyword:

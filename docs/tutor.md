@@ -8,18 +8,34 @@ Every statement must end with a semicolon (`;`).
 
 ### Variables
 
-Declare variables with `let`:
+Declare variables with `int64`:
 
 ```
-let x = 5;
-let name = 10 + 20;
+int64 x = 5;
+int64 name = 10 + 20;
 ```
 
 Variables can be used in expressions after they are declared:
 
 ```
-let a = 60 + 2 * 4;
-let b = a + 1;
+int64 a = 60 + 2 * 4;
+int64 b = a + 1;
+```
+
+### Constants
+
+Declare constant (immutable) variables with `const`:
+
+```
+const int64 x = 5;
+const int64 pi_approx = 3;
+```
+
+Constants cannot be reassigned:
+
+```
+const int64 x = 5;
+x = 10;  // error: cant change constant 'x'
 ```
 
 ### Reassignment
@@ -27,7 +43,7 @@ let b = a + 1;
 Variables can be reassigned with `=`:
 
 ```
-let x = 5;
+int64 x = 5;
 x = 10;
 x = x + 1;
 ```
@@ -38,7 +54,7 @@ Print an integer value to the console using `print`:
 
 ```
 print 42;
-let x = 10;
+int64 x = 10;
 print x;
 print x + 1;
 ```
@@ -55,7 +71,7 @@ exit 42;
 The return code can be any expression:
 
 ```
-let x = 100;
+int64 x = 100;
 exit x - 50;
 ```
 
@@ -76,7 +92,7 @@ All five math operators are supported: `+`, `-`, `*`, `//`, `%`.
 `*`, `//`, and `%` bind tighter than `+` and `-`:
 
 ```
-let a = 2 + 3 * 4;
+int64 a = 2 + 3 * 4;
 exit a;
 ```
 
@@ -87,8 +103,8 @@ This evaluates `3 * 4` first, then adds `2`, so the exit code is `14`.
 Variables can be used anywhere an integer literal can:
 
 ```
-let a = 10;
-let b = a + 5;
+int64 a = 10;
+int64 b = a + 5;
 exit b;
 ```
 

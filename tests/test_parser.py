@@ -1,9 +1,9 @@
 import pytest
 from parser.parser import Parser
 from parser.program import PROGRAM
-from parser.statements import ASSIGN_STATEMENT, EXIT_STATEMENT, LET_STATEMENT, PRINT_STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, INT64_STATEMENT, PRINT_STATEMENT
 from parser.expressions import BINARY_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, STR_EXPRESSION
-from tokenizer.keywords import ASSIGN_KEYWORD, EXIT_KEYWORD, LET_KEYWORD, MINUS_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON
+from tokenizer.keywords import ASSIGN_KEYWORD, CONST_KEYWORD, EXIT_KEYWORD, INT64_KEYWORD, MINUS_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON
 from tokenizer.literals import INT_LITERAL, STR_LITERAL
 from tokenizer.tokens import IDENTIFIER
 
@@ -221,19 +221,19 @@ class TestParserIntegration:
         expr = program.statements[0].return_code
         assert isinstance(expr, BINARY_EXPRESSION)
 
-    def test_full_pipeline_let_statement(self):
+    def test_full_pipeline_int64_statement(self):
         from tokenizer.tokenizer import Tokenizer
-        tokens = Tokenizer("let x = 5;").tokenize()
+        tokens = Tokenizer("int64 x = 5;").tokenize()
         program = Parser(tokens).parse()
         assert len(program.statements) == 1
-        assert isinstance(program.statements[0], LET_STATEMENT)
+        assert isinstance(program.statements[0], INT64_STATEMENT)
 
-    def test_full_pipeline_let_and_exit(self):
+    def test_full_pipeline_int64_and_exit(self):
         from tokenizer.tokenizer import Tokenizer
-        tokens = Tokenizer("let x = 5;\nexit x;").tokenize()
+        tokens = Tokenizer("int64 x = 5;\nexit x;").tokenize()
         program = Parser(tokens).parse()
         assert len(program.statements) == 2
-        assert isinstance(program.statements[0], LET_STATEMENT)
+        assert isinstance(program.statements[0], INT64_STATEMENT)
         assert isinstance(program.statements[1], EXIT_STATEMENT)
 
     def test_full_pipeline_subtraction(self):
@@ -244,58 +244,95 @@ class TestParserIntegration:
         assert isinstance(expr, BINARY_EXPRESSION)
 
 
-class TestParserLetStatement:
-    def test_simple_let(self):
+class TestParserInt64Statement:
+    def test_simple_int64(self):
         tokens = [
-            LET_KEYWORD(1), IDENTIFIER(1, "x"), ASSIGN_KEYWORD(1),
+            INT64_KEYWORD(1), IDENTIFIER(1, "x"), ASSIGN_KEYWORD(1),
             INT_LITERAL(1, 5), SEMICOLON(1),
         ]
         program = Parser(tokens).parse()
         assert len(program.statements) == 1
         stmt = program.statements[0]
-        assert isinstance(stmt, LET_STATEMENT)
+        assert isinstance(stmt, INT64_STATEMENT)
         assert stmt.identifier.name == "x"
         assert isinstance(stmt.expr, INT_EXPRESSION)
         assert stmt.expr.val == 5
 
-    def test_let_with_expression(self):
+    def test_int64_with_expression(self):
         tokens = [
-            LET_KEYWORD(1), IDENTIFIER(1, "y"), ASSIGN_KEYWORD(1),
+            INT64_KEYWORD(1), IDENTIFIER(1, "y"), ASSIGN_KEYWORD(1),
             INT_LITERAL(1, 1), PLUS_KEYWORD(1), INT_LITERAL(1, 2), SEMICOLON(1),
         ]
         program = Parser(tokens).parse()
         stmt = program.statements[0]
-        assert isinstance(stmt, LET_STATEMENT)
+        assert isinstance(stmt, INT64_STATEMENT)
         assert isinstance(stmt.expr, BINARY_EXPRESSION)
 
-    def test_let_missing_identifier(self):
-        tokens = [LET_KEYWORD(1), INT_LITERAL(1, 5), ASSIGN_KEYWORD(1), INT_LITERAL(1, 5), SEMICOLON(1)]
+    def test_int64_missing_identifier(self):
+        tokens = [INT64_KEYWORD(1), INT_LITERAL(1, 5), ASSIGN_KEYWORD(1), INT_LITERAL(1, 5), SEMICOLON(1)]
         with pytest.raises(ValueError, match="expected"):
             Parser(tokens).parse()
 
-    def test_let_missing_assign(self):
-        tokens = [LET_KEYWORD(1), IDENTIFIER(1, "x"), INT_LITERAL(1, 5), SEMICOLON(1)]
+    def test_int64_missing_assign(self):
+        tokens = [INT64_KEYWORD(1), IDENTIFIER(1, "x"), INT_LITERAL(1, 5), SEMICOLON(1)]
         with pytest.raises(ValueError, match="expected"):
             Parser(tokens).parse()
 
-    def test_let_missing_semicolon(self):
-        tokens = [LET_KEYWORD(1), IDENTIFIER(1, "x"), ASSIGN_KEYWORD(1), INT_LITERAL(1, 5)]
+    def test_int64_missing_semicolon(self):
+        tokens = [INT64_KEYWORD(1), IDENTIFIER(1, "x"), ASSIGN_KEYWORD(1), INT_LITERAL(1, 5)]
         with pytest.raises(ValueError, match="expected"):
             Parser(tokens).parse()
 
-    def test_let_repr(self):
-        stmt = LET_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5))
-        assert "LET_STATEMENT" in repr(stmt)
+    def test_int64_repr(self):
+        stmt = INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5))
+        assert "INT64_STATEMENT" in repr(stmt)
         assert "x" in repr(stmt)
 
-    def test_let_preserves_line_number(self):
+    def test_int64_preserves_line_number(self):
         tokens = [
-            LET_KEYWORD(3), IDENTIFIER(3, "z"), ASSIGN_KEYWORD(3),
+            INT64_KEYWORD(3), IDENTIFIER(3, "z"), ASSIGN_KEYWORD(3),
             INT_LITERAL(3, 10), SEMICOLON(3),
         ]
         program = Parser(tokens).parse()
         stmt = program.statements[0]
         assert stmt.line_number == 3
+
+
+class TestParserConstStatement:
+    def test_simple_const(self):
+        tokens = [
+            CONST_KEYWORD(1), INT64_KEYWORD(1), IDENTIFIER(1, "x"), ASSIGN_KEYWORD(1),
+            INT_LITERAL(1, 5), SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, CONST_STATEMENT)
+        assert isinstance(stmt.var_statement, INT64_STATEMENT)
+        assert stmt.var_statement.identifier.name == "x"
+        assert stmt.var_statement.expr.val == 5
+
+    def test_const_with_expression(self):
+        tokens = [
+            CONST_KEYWORD(1), INT64_KEYWORD(1), IDENTIFIER(1, "y"), ASSIGN_KEYWORD(1),
+            INT_LITERAL(1, 1), PLUS_KEYWORD(1), INT_LITERAL(1, 2), SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, CONST_STATEMENT)
+        assert isinstance(stmt.var_statement.expr, BINARY_EXPRESSION)
+
+    def test_const_repr(self):
+        inner = INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5))
+        stmt = CONST_STATEMENT(1, inner)
+        assert "CONST" in repr(stmt)
+
+    def test_full_pipeline_const(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("const int64 x = 5;").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        assert isinstance(program.statements[0], CONST_STATEMENT)
 
 
 class TestParserIdentifierExpression:
@@ -426,12 +463,12 @@ class TestParserPrintStatement:
         assert len(program.statements) == 1
         assert isinstance(program.statements[0], PRINT_STATEMENT)
 
-    def test_full_pipeline_let_and_print(self):
+    def test_full_pipeline_int64_and_print(self):
         from tokenizer.tokenizer import Tokenizer
-        tokens = Tokenizer("let x = 5;\nprint x;").tokenize()
+        tokens = Tokenizer("int64 x = 5;\nprint x;").tokenize()
         program = Parser(tokens).parse()
         assert len(program.statements) == 2
-        assert isinstance(program.statements[0], LET_STATEMENT)
+        assert isinstance(program.statements[0], INT64_STATEMENT)
         assert isinstance(program.statements[1], PRINT_STATEMENT)
 
 
@@ -470,11 +507,11 @@ class TestParserAssignStatement:
         assert len(program.statements) == 1
         assert isinstance(program.statements[0], ASSIGN_STATEMENT)
 
-    def test_full_pipeline_let_assign_exit(self):
+    def test_full_pipeline_int64_assign_exit(self):
         from tokenizer.tokenizer import Tokenizer
-        tokens = Tokenizer("let x = 1;\nx = 10;\nexit x;").tokenize()
+        tokens = Tokenizer("int64 x = 1;\nx = 10;\nexit x;").tokenize()
         program = Parser(tokens).parse()
         assert len(program.statements) == 3
-        assert isinstance(program.statements[0], LET_STATEMENT)
+        assert isinstance(program.statements[0], INT64_STATEMENT)
         assert isinstance(program.statements[1], ASSIGN_STATEMENT)
         assert isinstance(program.statements[2], EXIT_STATEMENT)

@@ -1,12 +1,14 @@
 from parser.ast_node import ASTNode
 from tokenizer.keywords import MATH_OPERATION
-from tokenizer.tokens import IDENTIFIER
 
 
 class EXPRESSION(ASTNode):
     def __init__(self, line_number: int) -> None:
         super().__init__()
         self.line_number: int = line_number
+
+    def __repr__(self) -> str:
+        return str(self)
 
 class INT_EXPRESSION(EXPRESSION):
     def __init__(self, line_number: int, val: int) -> None:
@@ -16,9 +18,6 @@ class INT_EXPRESSION(EXPRESSION):
     def __str__(self) -> str:
         return f"{self.val}"
 
-    def __repr__(self) -> str:
-        return str(self)
-
 class STR_EXPRESSION(EXPRESSION):
     def __init__(self, line_number: int, val: str) -> None:
         super().__init__(line_number)
@@ -26,9 +25,6 @@ class STR_EXPRESSION(EXPRESSION):
 
     def __str__(self) -> str:
         return f"{self.val}"
-
-    def __repr__(self) -> str:
-        return str(self)
 
 class BINARY_EXPRESSION(EXPRESSION):
     def __init__(self, line_number: int, lval: EXPRESSION, op: MATH_OPERATION, rval: EXPRESSION) -> None:
@@ -40,9 +36,6 @@ class BINARY_EXPRESSION(EXPRESSION):
     def __str__(self) -> str:
         return f"{self.lval} {self.op} {self.rval}"
 
-    def __repr__(self) -> str:
-        return str(self)
-
 class IDENTIFIER_EXPRESSION(EXPRESSION):
     def __init__(self, line_number: int, identifier: str) -> None:
         super().__init__(line_number)
@@ -50,7 +43,4 @@ class IDENTIFIER_EXPRESSION(EXPRESSION):
 
     def __str__(self) -> str:
         return f"{self.name}"
-
-    def __repr__(self) -> str:
-        return str(self)
 

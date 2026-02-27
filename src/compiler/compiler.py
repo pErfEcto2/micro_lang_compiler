@@ -1,6 +1,6 @@
 from parser.expressions import BINARY_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION
 from parser.program import PROGRAM
-from parser.statements import ASSIGN_STATEMENT, EXIT_STATEMENT, LET_STATEMENT, PRINT_STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, INT64_STATEMENT, PRINT_STATEMENT, VARIABLE_TYPE
 from tokenizer.keywords import INT_DIVISION_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD
 
 
@@ -12,12 +12,13 @@ class Compiler:
         self._externs: set[str] = set()
         self._asm: list[str] = []
         self._vars: dict[str, int] = {}
+        self._consts: dict[str, int] = {}
         self._num_of_vars: int = 0
         self._qword_size: int = 8
 
     def _get_stack_offset(self, var: str) -> int:
-        assert var in self._vars
-        return self._qword_size * self._vars[var]
+        assert var in self._vars or var in self._consts
+        return self._qword_size * (self._vars.get(var) or self._consts.get(var))
 
     def _push(self, var: str) -> None:
         self._text_s.append(f"    push {var}")
@@ -112,7 +113,7 @@ class Compiler:
                     case _:
                         raise ValueError(f"invalid operation type '{type(expr.op)}' ('{MATH_OPERATION}' expected)")
             case IDENTIFIER_EXPRESSION():
-                if expr.name not in self._vars:
+                if expr.name not in self._vars and expr.name not in self._consts:
                     raise ValueError(f"unknown identifier '{expr.name}' in line {expr.line_number}")
 
                 stack_offset = self._get_stack_offset(expr.name)
@@ -130,8 +131,10 @@ class Compiler:
         self._mov("rax", "60")
         self._syscall()
 
-    def _gen_let(self, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION) -> None:
-        if self._vars.get(identifier.name) is None:
+    def _gen_int64(self, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION) -> None:
+        if self._consts.get(identifier.name) is not None:
+            raise ValueError(f"constant {identifier} already exists (line {identifier.line_number})")
+        elif self._vars.get(identifier.name) is None:
             self._num_of_vars += 1
             self._vars[identifier.name] = self._num_of_vars
         else:
@@ -152,7 +155,9 @@ class Compiler:
         self._call("printf")
 
     def _gen_assing(self, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION) -> None:
-        if identifier.name not in self._vars:
+        if identifier.name in self._consts:
+            raise ValueError(f"cant change constant '{identifier.name}' in line {identifier.line_number}")
+        elif identifier.name not in self._vars:
             raise ValueError(f"unknown identifier '{identifier.name}' in line {identifier.line_number}")
 
         self._eval_expr(expr)
@@ -160,14 +165,36 @@ class Compiler:
         stack_offset = self._get_stack_offset(identifier.name)
         self._mov(f"qword [rbp - {stack_offset}]", "rax")
 
+
+    def _gen_const(self, var_statement: VARIABLE_TYPE) -> None:
+        identifier = var_statement.identifier
+        expr = var_statement.expr
+
+        if self._vars.get(identifier.name) is not None:
+            raise ValueError(f"variable {identifier} already exists (line {identifier.line_number})")
+        elif self._consts.get(identifier.name) is None:
+            self._num_of_vars += 1
+            self._consts[identifier.name] = self._num_of_vars
+        else:
+            raise ValueError(f"constant {identifier} already exists (line {identifier.line_number})")
+
+        stack_offset = self._get_stack_offset(identifier.name)
+        self._sub("rsp", str(self._qword_size))
+        self._eval_expr(expr)
+        self._pop("rax")
+        self._mov(f"qword [rbp - {stack_offset}]", "rax")
+
     def compile(self) -> str:
         for statement in self._ast.statements:
             match statement:
+                case CONST_STATEMENT():
+                    self._gen_const(statement.var_statement)
+
                 case EXIT_STATEMENT():
                     self._gen_exit(statement.return_code)
 
-                case LET_STATEMENT():
-                    self._gen_let(statement.identifier, statement.expr)
+                case INT64_STATEMENT():
+                    self._gen_int64(statement.identifier, statement.expr)
 
                 case PRINT_STATEMENT():
                     self._gen_print(statement.expr)

@@ -5,6 +5,9 @@ class KEYWORD(Token):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)
 
+    def __repr__(self) -> str:
+        return str(self)
+
 
 KEYWORDS: dict[str, type[KEYWORD]] = {}
 
@@ -22,9 +25,6 @@ class SEMICOLON(KEYWORD):
     def __str__(self) -> str:
         return ";"
 
-    def __repr__(self) -> str:
-        return str(self)
-
 @register_keyword("exit")
 class EXIT_KEYWORD(KEYWORD):
     def __init__(self, line_num: int) -> None:
@@ -33,19 +33,21 @@ class EXIT_KEYWORD(KEYWORD):
     def __str__(self) -> str:
         return "exit"
 
-    def __repr__(self) -> str:
-        return str(self)
-
-@register_keyword("let")
-class LET_KEYWORD(KEYWORD):
+@register_keyword("const")
+class CONST_KEYWORD(KEYWORD):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)
 
     def __str__(self) -> str:
-        return "let"
+        return "const"
 
-    def __repr__(self) -> str:
-        return str(self)
+@register_keyword("int64")
+class INT64_KEYWORD(KEYWORD):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+
+    def __str__(self) -> str:
+        return "int64"
 
 @register_keyword("print")
 class PRINT_KEYWORD(KEYWORD):
@@ -55,9 +57,6 @@ class PRINT_KEYWORD(KEYWORD):
     def __str__(self) -> str:
         return "print"
 
-    def __repr__(self) -> str:
-        return str(self)
-
 @register_keyword("=")
 class ASSIGN_KEYWORD(KEYWORD):
     def __init__(self, line_num: int) -> None:
@@ -65,9 +64,6 @@ class ASSIGN_KEYWORD(KEYWORD):
 
     def __str__(self) -> str:
         return "="
-
-    def __repr__(self) -> str:
-        return str(self)
 
 class MATH_OPERATION(KEYWORD):
     def __init__(self, line_num: int) -> None:
@@ -82,9 +78,6 @@ class PLUS_KEYWORD(MATH_OPERATION):
     def __str__(self) -> str:
         return "+"
 
-    def __repr__(self) -> str:
-        return str(self)
-
 @register_keyword("-")
 class MINUS_KEYWORD(MATH_OPERATION):
     def __init__(self, line_num: int) -> None:
@@ -93,9 +86,6 @@ class MINUS_KEYWORD(MATH_OPERATION):
 
     def __str__(self) -> str:
         return "-"
-
-    def __repr__(self) -> str:
-        return str(self)
 
 @register_keyword("*")
 class MULTIPLY_KEYWORD(MATH_OPERATION):
@@ -106,9 +96,6 @@ class MULTIPLY_KEYWORD(MATH_OPERATION):
     def __str__(self) -> str:
         return "*"
 
-    def __repr__(self) -> str:
-        return str(self)
-
 @register_keyword("//")
 class INT_DIVISION_KEYWORD(MATH_OPERATION):
     def __init__(self, line_num: int) -> None:
@@ -118,9 +105,6 @@ class INT_DIVISION_KEYWORD(MATH_OPERATION):
     def __str__(self) -> str:
         return "//"
 
-    def __repr__(self) -> str:
-        return str(self)
-
 @register_keyword("%")
 class MODULO_KEYWORD(MATH_OPERATION):
     def __init__(self, line_num: int) -> None:
@@ -129,6 +113,3 @@ class MODULO_KEYWORD(MATH_OPERATION):
 
     def __str__(self) -> str:
         return "%"
-
-    def __repr__(self) -> str:
-        return str(self)

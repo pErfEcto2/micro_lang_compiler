@@ -4,12 +4,13 @@
 
 | Keyword | Description |
 |---------|-------------|
-| `let` | Declare a variable |
+| `int64` | Declare an int64 variable |
 | `exit` | Exit a program with given return code |
 | `print` | Print int32 to the console |
 | `if/else` | Branching *(not implemented)* |
 | `while` | Loop *(not implemented)* |
 | `=` | Assign |
+| `const` | Make a variable constant |
 
 ## Math operators
 

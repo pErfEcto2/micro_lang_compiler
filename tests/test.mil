@@ -1,3 +1,4 @@
-let a = 60;
-a = a + 9;
+const int64 a = 60;
+int64 aa = a + 1;
+print aa;
 print a;

@@ -16,7 +16,7 @@ parser.add_argument("src", help="path to the file with a source code")
 
 args = parser.parse_args()
 
-N = 50
+N = 100
 
 if not os.path.exists(args.src):
     print(f"no such file or directory: {args.src}")
