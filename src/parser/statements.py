@@ -50,6 +50,20 @@ class ASSIGN_STATEMENT(STATEMENT):
     def __str__(self) -> str:
         return f"ASSIGN_STATEMENT(identifier: {self.identifier}, expr: {self.expr})"
 
+class OPEN_C_STATEMENT(STATEMENT):
+    def __init__(self, line_number: int) -> None:
+        super().__init__(line_number)
+
+    def __str__(self) -> str:
+        return "OPEN_C_STATEMENT"
+
+class CLOSE_C_STATEMENT(STATEMENT):
+    def __init__(self, line_number: int) -> None:
+        super().__init__(line_number)
+
+    def __str__(self) -> str:
+        return "CLOSE_C_STATEMENT"
+
 class PRINT_STATEMENT(STATEMENT):
     def __init__(self, line_number: int, expr: EXPRESSION) -> None:
         super().__init__(line_number)

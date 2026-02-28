@@ -1,8 +1,50 @@
 from parser.expressions import BINARY_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION
 from parser.program import PROGRAM
-from parser.statements import ASSIGN_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, INT64_STATEMENT, PRINT_STATEMENT, VARIABLE_TYPE
+from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT, VARIABLE_TYPE
 from tokenizer.keywords import INT_DIVISION_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD
 
+
+class Scope:
+    def __init__(self, line_number: int, stack_offset: int = 0) -> None:
+        self._vars: dict[str, int] = {}
+        self._consts: dict[str, int] = {}
+        self._size: int = 0
+        self._stack_offset: int = stack_offset
+        self.line_number: int = line_number
+
+    def add_var(self, var_name: str) -> None:
+        self._size += 1
+        self._vars[var_name] = self._size + self._stack_offset
+
+    def add_const(self, const_name: str) -> None:
+        self._size += 1
+        self._consts[const_name] = self._size + self._stack_offset
+
+    def has_var(self, name: str) -> bool:
+        return name in self._vars
+
+    def has_const(self, name: str) -> bool:
+        return name in self._consts
+
+    def has(self, name: str) -> bool:
+        return self.has_var(name) or self.has_const(name)
+
+    def get_const(self, name: str) -> int:
+        return self._consts[name]
+
+    def get_var(self, name: str) -> int:
+        return self._vars[name]
+
+    def get(self, name: str) -> int:
+        if name in self._vars:
+            return self._vars[name]
+        return self._consts[name]
+
+    def get_size(self) -> int:
+        return self._size
+
+    def get_stack_offset(self) -> int:
+        return self._size + self._stack_offset
 
 class Compiler:
     def __init__(self, prog: PROGRAM) -> None:
@@ -11,14 +53,39 @@ class Compiler:
         self._data_s: set[str] = set()
         self._externs: set[str] = set()
         self._asm: list[str] = []
-        self._vars: dict[str, int] = {}
-        self._consts: dict[str, int] = {}
-        self._num_of_vars: int = 0
+        self._scopes: list[Scope] = [Scope(0)]
         self._qword_size: int = 8
 
-    def _get_stack_offset(self, var: str) -> int:
-        assert var in self._vars or var in self._consts
-        return self._qword_size * (self._vars.get(var) or self._consts.get(var))
+    def _add_const(self, name: str) -> None:
+        self._scopes[-1].add_const(name)
+
+    def _add_var(self, name: str) -> None:
+        self._scopes[-1].add_var(name)
+
+    def _get_stack_offset(self, name: str) -> int:
+        for scope in reversed(self._scopes):
+            if scope.has(name):
+                return self._qword_size * scope.get(name)
+
+        raise ValueError(f"unknown identifier '{name}'")
+
+    def _has_const(self, name: str) -> bool:
+        for scope in self._scopes:
+            if scope.has_const(name):
+                return True
+        return False
+
+    def _has_var(self, name: str) -> bool:
+        for scope in self._scopes:
+            if scope.has_var(name):
+                return True
+        return False
+
+    def _has_var_or_const(self, name: str) -> bool:
+        for scope in self._scopes:
+            if scope.has(name):
+                return True
+        return False
 
     def _push(self, var: str) -> None:
         self._text_s.append(f"    push {var}")
@@ -113,7 +180,7 @@ class Compiler:
                     case _:
                         raise ValueError(f"invalid operation type '{type(expr.op)}' ('{MATH_OPERATION}' expected)")
             case IDENTIFIER_EXPRESSION():
-                if expr.name not in self._vars and expr.name not in self._consts:
+                if not self._has_var_or_const(expr.name):
                     raise ValueError(f"unknown identifier '{expr.name}' in line {expr.line_number}")
 
                 stack_offset = self._get_stack_offset(expr.name)
@@ -132,11 +199,11 @@ class Compiler:
         self._syscall()
 
     def _gen_int64(self, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION) -> None:
-        if self._consts.get(identifier.name) is not None:
+        current_scope = self._scopes[-1]
+        if current_scope.has_const(identifier.name):
             raise ValueError(f"constant {identifier} already exists (line {identifier.line_number})")
-        elif self._vars.get(identifier.name) is None:
-            self._num_of_vars += 1
-            self._vars[identifier.name] = self._num_of_vars
+        elif not current_scope.has_var(identifier.name):
+            self._add_var(identifier.name)
         else:
             raise ValueError(f"identifier {identifier} already exists (line {identifier.line_number})")
 
@@ -154,10 +221,10 @@ class Compiler:
         self._mov("rax", "0")
         self._call("printf")
 
-    def _gen_assing(self, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION) -> None:
-        if identifier.name in self._consts:
+    def _gen_assign(self, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION) -> None:
+        if self._has_const(identifier.name):
             raise ValueError(f"cant change constant '{identifier.name}' in line {identifier.line_number}")
-        elif identifier.name not in self._vars:
+        elif not self._has_var(identifier.name):
             raise ValueError(f"unknown identifier '{identifier.name}' in line {identifier.line_number}")
 
         self._eval_expr(expr)
@@ -165,16 +232,15 @@ class Compiler:
         stack_offset = self._get_stack_offset(identifier.name)
         self._mov(f"qword [rbp - {stack_offset}]", "rax")
 
-
     def _gen_const(self, var_statement: VARIABLE_TYPE) -> None:
         identifier = var_statement.identifier
         expr = var_statement.expr
+        current_scope = self._scopes[-1]
 
-        if self._vars.get(identifier.name) is not None:
-            raise ValueError(f"variable {identifier} already exists (line {identifier.line_number})")
-        elif self._consts.get(identifier.name) is None:
-            self._num_of_vars += 1
-            self._consts[identifier.name] = self._num_of_vars
+        if current_scope.has_var(identifier.name):
+            raise ValueError(f"identifier {identifier} already exists (line {identifier.line_number})")
+        elif not self._has_const(identifier.name):
+            self._add_const(identifier.name)
         else:
             raise ValueError(f"constant {identifier} already exists (line {identifier.line_number})")
 
@@ -184,26 +250,36 @@ class Compiler:
         self._pop("rax")
         self._mov(f"qword [rbp - {stack_offset}]", "rax")
 
+    def _add_scope(self, line_number: int) -> None:
+        stack_offset = self._scopes[-1].get_stack_offset()
+        self._scopes.append(Scope(line_number, stack_offset))
+
+    def _remove_scope(self) -> None:
+        scope = self._scopes.pop()
+        self._add("rsp", str(scope.get_size() * self._qword_size))
+
     def compile(self) -> str:
         for statement in self._ast.statements:
             match statement:
+                case OPEN_C_STATEMENT():
+                    self._add_scope(statement.line_number)
+                case CLOSE_C_STATEMENT():
+                    self._remove_scope()
                 case CONST_STATEMENT():
                     self._gen_const(statement.var_statement)
-
                 case EXIT_STATEMENT():
                     self._gen_exit(statement.return_code)
-
                 case INT64_STATEMENT():
                     self._gen_int64(statement.identifier, statement.expr)
-
                 case PRINT_STATEMENT():
                     self._gen_print(statement.expr)
-
                 case ASSIGN_STATEMENT():
-                    self._gen_assing(statement.identifier, statement.expr)
-                
+                    self._gen_assign(statement.identifier, statement.expr)
                 case _:
                     raise ValueError(f"unexpected statement '{statement}' in line {statement.line_number}")
+
+        if len(self._scopes) > 1:
+            raise ValueError(f"scope was opened in line {self._scopes[-1].line_number}, but never closed")
 
         self._gen_suffix()
         self._gen_prefix()

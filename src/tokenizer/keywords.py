@@ -17,13 +17,26 @@ def register_keyword(keyword_text):
         return cls
     return wrapper
 
-@register_keyword(";")
 class SEMICOLON(KEYWORD):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)
 
     def __str__(self) -> str:
         return ";"
+
+class OPEN_C_BRACKET(KEYWORD):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+
+    def __str__(self) -> str:
+        return "{"
+
+class CLOSE_C_BRACKET(KEYWORD):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+
+    def __str__(self) -> str:
+        return "}"
 
 @register_keyword("exit")
 class EXIT_KEYWORD(KEYWORD):
@@ -57,7 +70,6 @@ class PRINT_KEYWORD(KEYWORD):
     def __str__(self) -> str:
         return "print"
 
-@register_keyword("=")
 class ASSIGN_KEYWORD(KEYWORD):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)
@@ -69,7 +81,6 @@ class MATH_OPERATION(KEYWORD):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)
 
-@register_keyword("+")
 class PLUS_KEYWORD(MATH_OPERATION):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)
@@ -78,7 +89,6 @@ class PLUS_KEYWORD(MATH_OPERATION):
     def __str__(self) -> str:
         return "+"
 
-@register_keyword("-")
 class MINUS_KEYWORD(MATH_OPERATION):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)
@@ -87,7 +97,6 @@ class MINUS_KEYWORD(MATH_OPERATION):
     def __str__(self) -> str:
         return "-"
 
-@register_keyword("*")
 class MULTIPLY_KEYWORD(MATH_OPERATION):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)
@@ -96,7 +105,6 @@ class MULTIPLY_KEYWORD(MATH_OPERATION):
     def __str__(self) -> str:
         return "*"
 
-@register_keyword("//")
 class INT_DIVISION_KEYWORD(MATH_OPERATION):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)
@@ -105,7 +113,6 @@ class INT_DIVISION_KEYWORD(MATH_OPERATION):
     def __str__(self) -> str:
         return "//"
 
-@register_keyword("%")
 class MODULO_KEYWORD(MATH_OPERATION):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)

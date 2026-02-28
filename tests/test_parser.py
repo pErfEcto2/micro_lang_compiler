@@ -1,9 +1,9 @@
 import pytest
 from parser.parser import Parser
 from parser.program import PROGRAM
-from parser.statements import ASSIGN_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, INT64_STATEMENT, PRINT_STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT
 from parser.expressions import BINARY_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, STR_EXPRESSION
-from tokenizer.keywords import ASSIGN_KEYWORD, CONST_KEYWORD, EXIT_KEYWORD, INT64_KEYWORD, MINUS_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON
+from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_C_BRACKET, CONST_KEYWORD, EXIT_KEYWORD, INT64_KEYWORD, MINUS_KEYWORD, MULTIPLY_KEYWORD, OPEN_C_BRACKET, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON
 from tokenizer.literals import INT_LITERAL, STR_LITERAL
 from tokenizer.tokens import IDENTIFIER
 
@@ -515,3 +515,67 @@ class TestParserAssignStatement:
         assert isinstance(program.statements[0], INT64_STATEMENT)
         assert isinstance(program.statements[1], ASSIGN_STATEMENT)
         assert isinstance(program.statements[2], EXIT_STATEMENT)
+
+
+class TestParserScopeStatements:
+    def test_empty_scope(self):
+        tokens = [OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1)]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 2
+        assert isinstance(program.statements[0], OPEN_C_STATEMENT)
+        assert isinstance(program.statements[1], CLOSE_C_STATEMENT)
+
+    def test_scope_with_statement(self):
+        tokens = [
+            OPEN_C_BRACKET(1),
+            INT64_KEYWORD(2), IDENTIFIER(2, "x"), ASSIGN_KEYWORD(2),
+            INT_LITERAL(2, 5), SEMICOLON(2),
+            CLOSE_C_BRACKET(3),
+        ]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 3
+        assert isinstance(program.statements[0], OPEN_C_STATEMENT)
+        assert isinstance(program.statements[1], INT64_STATEMENT)
+        assert isinstance(program.statements[2], CLOSE_C_STATEMENT)
+
+    def test_scope_preserves_line_numbers(self):
+        tokens = [OPEN_C_BRACKET(5), CLOSE_C_BRACKET(10)]
+        program = Parser(tokens).parse()
+        assert program.statements[0].line_number == 5
+        assert program.statements[1].line_number == 10
+
+    def test_nested_scopes(self):
+        tokens = [
+            OPEN_C_BRACKET(1), OPEN_C_BRACKET(2),
+            CLOSE_C_BRACKET(3), CLOSE_C_BRACKET(4),
+        ]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 4
+        assert isinstance(program.statements[0], OPEN_C_STATEMENT)
+        assert isinstance(program.statements[1], OPEN_C_STATEMENT)
+        assert isinstance(program.statements[2], CLOSE_C_STATEMENT)
+        assert isinstance(program.statements[3], CLOSE_C_STATEMENT)
+
+    def test_scope_repr(self):
+        assert "OPEN_C_STATEMENT" in repr(OPEN_C_STATEMENT(1))
+        assert "CLOSE_C_STATEMENT" in repr(CLOSE_C_STATEMENT(1))
+
+    def test_full_pipeline_scope(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("{ int64 x = 5; }").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 3
+        assert isinstance(program.statements[0], OPEN_C_STATEMENT)
+        assert isinstance(program.statements[1], INT64_STATEMENT)
+        assert isinstance(program.statements[2], CLOSE_C_STATEMENT)
+
+    def test_full_pipeline_nested_scope(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("int64 a = 1;\n{ int64 b = 2; }\nprint a;").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 5
+        assert isinstance(program.statements[0], INT64_STATEMENT)
+        assert isinstance(program.statements[1], OPEN_C_STATEMENT)
+        assert isinstance(program.statements[2], INT64_STATEMENT)
+        assert isinstance(program.statements[3], CLOSE_C_STATEMENT)
+        assert isinstance(program.statements[4], PRINT_STATEMENT)

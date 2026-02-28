@@ -1,4 +1,11 @@
-const int64 a = 60;
-int64 aa = a + 1;
-print aa;
+int64 a = 60;
 print a;
+
+{
+  print a;
+  int64 a = 1;
+  print a;
+}
+
+print a;
+exit 0;

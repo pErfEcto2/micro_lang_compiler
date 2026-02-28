@@ -1,4 +1,4 @@
-from tokenizer.keywords import ASSIGN_KEYWORD, INT_DIVISION_KEYWORD, KEYWORDS, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD, SEMICOLON
+from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_C_BRACKET, INT_DIVISION_KEYWORD, KEYWORDS, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, OPEN_C_BRACKET, PLUS_KEYWORD, SEMICOLON
 from tokenizer.literals import INT_LITERAL
 from tokenizer.tokens import Token, IDENTIFIER
 
@@ -10,6 +10,7 @@ class Tokenizer:
         self._line_num: int = 1
         self._idx: int = 0
         self._stop_chars: list[str] = [" ", "\n", "\t", ";"]
+        self._c_brackets: int = 0
 
     def _peek(self, offset: int = 0) -> str | None:
         return self._src[self._idx + offset] if self._idx + offset < self._src_len else None
@@ -52,29 +53,33 @@ class Tokenizer:
                     case "/":
                         tokens.append(INT_DIVISION_KEYWORD(self._line_num))
                         self._consume()
+                    case _:
+                        raise ValueError(f"invalid syntax after '/' in line {self._line_num}")
 
             elif char == "%":
                 tokens.append(MODULO_KEYWORD(self._line_num))
-
+            elif char == "{":
+                tokens.append(OPEN_C_BRACKET(self._line_num))
+                self._c_brackets += 1
+            elif char == "}":
+                tokens.append(CLOSE_C_BRACKET(self._line_num))
+                self._c_brackets -= 1
             elif char == "=":
                 tokens.append(ASSIGN_KEYWORD(self._line_num))
-
             elif char == "+":
                 tokens.append(PLUS_KEYWORD(self._line_num))
-
             elif char == "-":
                 tokens.append(MINUS_KEYWORD(self._line_num))
-
             elif char == "*":
                 tokens.append(MULTIPLY_KEYWORD(self._line_num))
-
             elif char == ";":
                 tokens.append(SEMICOLON(self._line_num))
-            
             elif char == "\n":
                 self._line_num += 1
-            
             else:
                 raise ValueError(f"unknown character '{char}' in line {self._line_num}")
+
+        if self._c_brackets != 0:
+            raise ValueError("unmatched number of opened and closed curly brackets")
 
         return tokens

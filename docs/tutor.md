@@ -59,6 +59,25 @@ print x;
 print x + 1;
 ```
 
+### Scopes
+
+Use curly brackets `{ }` to create a new scope. Variables declared inside a scope are local to it and cleaned up when the scope ends. Inner scopes can access variables from outer scopes, and can shadow them with new declarations:
+
+```
+int64 x = 10;
+print x;
+
+{
+  print x;
+  int64 x = 99;
+  print x;
+}
+
+print x;
+```
+
+Output: `10`, `10`, `99`, `10`.
+
 ### Exit
 
 Exit the program with a return code using `exit`:

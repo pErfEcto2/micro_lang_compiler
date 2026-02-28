@@ -1,7 +1,7 @@
 import pytest
 from compiler.compiler import Compiler
 from parser.program import PROGRAM
-from parser.statements import ASSIGN_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, INT64_STATEMENT, PRINT_STATEMENT, STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT, STATEMENT
 from parser.expressions import BINARY_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, STR_EXPRESSION
 from tokenizer.keywords import INT_DIVISION_KEYWORD, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD
 
@@ -519,3 +519,106 @@ class TestCompilerConstStatement:
         result = Compiler(prog).compile()
         assert "    mov qword [rbp - 8], rax" in result
         assert "    pop rdi" in result
+
+
+class TestCompilerScopeStatement:
+    def test_empty_scope(self):
+        prog = _make_program(
+            OPEN_C_STATEMENT(1),
+            CLOSE_C_STATEMENT(2),
+        )
+        result = Compiler(prog).compile()
+        assert "    add rsp, 0" in result
+
+    def test_scope_with_var(self):
+        prog = _make_program(
+            OPEN_C_STATEMENT(1),
+            INT64_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "x"), INT_EXPRESSION(2, 5)),
+            CLOSE_C_STATEMENT(3),
+        )
+        result = Compiler(prog).compile()
+        assert "    sub rsp, 8" in result
+        assert "    mov qword [rbp - 8], rax" in result
+        assert "    add rsp, 8" in result
+
+    def test_var_shadowing_in_scope(self):
+        prog = _make_program(
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 10)),
+            OPEN_C_STATEMENT(2),
+            INT64_STATEMENT(3, IDENTIFIER_EXPRESSION(3, "x"), INT_EXPRESSION(3, 20)),
+            CLOSE_C_STATEMENT(4),
+        )
+        result = Compiler(prog).compile()
+        assert "    mov qword [rbp - 8], rax" in result
+        assert "    mov qword [rbp - 16], rax" in result
+
+    def test_outer_var_accessible_from_inner_scope(self):
+        prog = _make_program(
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 42)),
+            OPEN_C_STATEMENT(2),
+            PRINT_STATEMENT(3, IDENTIFIER_EXPRESSION(3, "x")),
+            CLOSE_C_STATEMENT(4),
+        )
+        result = Compiler(prog).compile()
+        assert "    mov rax, qword [rbp - 8]" in result
+        assert "    call printf" in result
+
+    def test_unclosed_scope_raises(self):
+        prog = _make_program(
+            OPEN_C_STATEMENT(1),
+            INT64_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "x"), INT_EXPRESSION(2, 5)),
+        )
+        with pytest.raises(ValueError, match="never closed"):
+            Compiler(prog).compile()
+
+    def test_const_in_scope(self):
+        inner = INT64_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "y"), INT_EXPRESSION(2, 99))
+        prog = _make_program(
+            OPEN_C_STATEMENT(1),
+            CONST_STATEMENT(2, inner),
+            CLOSE_C_STATEMENT(3),
+        )
+        result = Compiler(prog).compile()
+        assert "    mov qword [rbp - 8], rax" in result
+        assert "    add rsp, 8" in result
+
+    def test_assign_outer_var_from_inner_scope(self):
+        prog = _make_program(
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 1)),
+            OPEN_C_STATEMENT(2),
+            ASSIGN_STATEMENT(3, IDENTIFIER_EXPRESSION(3, "x"), INT_EXPRESSION(3, 99)),
+            CLOSE_C_STATEMENT(4),
+        )
+        result = Compiler(prog).compile()
+        assert result.count("    mov qword [rbp - 8], rax") == 2
+
+    def test_assign_outer_const_from_inner_scope_raises(self):
+        inner = INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 1))
+        prog = _make_program(
+            CONST_STATEMENT(1, inner),
+            OPEN_C_STATEMENT(2),
+            ASSIGN_STATEMENT(3, IDENTIFIER_EXPRESSION(3, "x"), INT_EXPRESSION(3, 99)),
+            CLOSE_C_STATEMENT(4),
+        )
+        with pytest.raises(ValueError, match="cant change constant"):
+            Compiler(prog).compile()
+
+    def test_full_pipeline_scope(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("int64 a = 1;\n{ int64 b = 2;\nprint b; }\nprint a;").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    add rsp, 8" in result
+        assert result.count("    call printf") == 2
+
+    def test_full_pipeline_shadowing(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("int64 a = 60;\n{ int64 a = 1;\nprint a; }\nprint a;").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    mov qword [rbp - 8], rax" in result
+        assert "    mov qword [rbp - 16], rax" in result

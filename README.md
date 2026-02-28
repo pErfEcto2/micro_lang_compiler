@@ -7,6 +7,7 @@ A compiler for a minimal programming language that compiles to x86 assembly (NAS
 - `int64` — declare Int64 variables
 - `const` — declare constant (immutable) variables
 - `=` — reassign variables
+- `{ }` — scoped blocks with local variables
 - `print` — print Int64 to console
 - `exit` — exit with a return code
 - Arithmetic expressions: `+`, `-`, `*`, `//`, `%`
@@ -40,6 +41,12 @@ print x;
 const int64 y = 42;
 print y;
 
+{
+  int64 x = 99;
+  print x;
+}
+
+print x;
 exit 0;
 ```
 

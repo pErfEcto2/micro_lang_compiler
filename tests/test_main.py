@@ -312,3 +312,49 @@ class TestMainAssignStatement:
                 assert "qword [rbp - 8]" in content
         finally:
             os.unlink(src_path)
+
+
+class TestMainScopeStatement:
+    def test_scope_creates_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("int64 a = 1;\n{ int64 b = 2;\nprint b; }\nprint a;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "add rsp, 8" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_unmatched_brackets_fails(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("{ int64 x = 1;")
+            src_path = f.name
+
+        try:
+            result = run_compiler("-n", src_path)
+            assert result.returncode != 0
+        finally:
+            os.unlink(src_path)
+
+    def test_scope_with_shadowing(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("int64 a = 60;\n{ int64 a = 1;\nprint a; }\nprint a;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "qword [rbp - 8]" in content
+                assert "qword [rbp - 16]" in content
+        finally:
+            os.unlink(src_path)

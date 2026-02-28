@@ -1,7 +1,7 @@
-from parser.statements import ASSIGN_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, INT64_STATEMENT, PRINT_STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT
 from parser.program import PROGRAM
 from parser.expressions import BINARY_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION
-from tokenizer.keywords import ASSIGN_KEYWORD, CONST_KEYWORD, EXIT_KEYWORD, INT64_KEYWORD, MATH_OPERATION, PRINT_KEYWORD, SEMICOLON
+from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_C_BRACKET, CONST_KEYWORD, EXIT_KEYWORD, INT64_KEYWORD, MATH_OPERATION, OPEN_C_BRACKET, PRINT_KEYWORD, SEMICOLON
 from tokenizer.literals import INT_LITERAL
 from tokenizer.tokens import IDENTIFIER, Token
 
@@ -63,21 +63,24 @@ class Parser:
     def _parse_exit_statement(self) -> EXIT_STATEMENT:
         expr = self._parse_expr(self._consume())
         self._assert_current_token_type(SEMICOLON)
+        self._consume()
         return EXIT_STATEMENT(expr.line_number, expr)
 
     def _parse_int64_statement(self) -> INT64_STATEMENT:
         self._assert_current_token_type(IDENTIFIER)
-        identiefier = self._consume()
-        identiefier = IDENTIFIER_EXPRESSION(identiefier.line_number, identiefier.val)
+        identifier = self._consume()
+        identifier = IDENTIFIER_EXPRESSION(identifier.line_number, identifier.val)
         self._assert_current_token_type(ASSIGN_KEYWORD)
         self._consume()
         expr = self._parse_expr(self._consume())
         self._assert_current_token_type(SEMICOLON)
-        return INT64_STATEMENT(expr.line_number, identiefier, expr)
+        self._consume()
+        return INT64_STATEMENT(expr.line_number, identifier, expr)
 
     def _parse_print_statement(self) -> PRINT_STATEMENT:
         expr = self._parse_expr(self._consume())
         self._assert_current_token_type(SEMICOLON)
+        self._consume()
         return PRINT_STATEMENT(expr.line_number, expr)
 
     def _parse_assign_statement(self, ln: int, name: str) -> ASSIGN_STATEMENT:
@@ -96,6 +99,10 @@ class Parser:
         while self._peek():
             token: Token = self._consume()
             match token:
+                case OPEN_C_BRACKET():
+                    program.statements.append(OPEN_C_STATEMENT(token.line_number))
+                case CLOSE_C_BRACKET():
+                    program.statements.append(CLOSE_C_STATEMENT(token.line_number))
                 case CONST_KEYWORD():
                     const_statement = self._parse_const_statement(token.line_number)
                     program.statements.append(const_statement)

@@ -6,7 +6,7 @@
 |---------|-------------|
 | `int64` | Declare an int64 variable |
 | `exit` | Exit a program with given return code |
-| `print` | Print int32 to the console |
+| `print` | Print int64 to the console |
 | `if/else` | Branching *(not implemented)* |
 | `while` | Loop *(not implemented)* |
 | `=` | Assign |
@@ -38,5 +38,5 @@
 | Symbol | Description |
 |--------|-------------|
 | `;` | End of the command |
-| `{` | Beginning of a scope *(not implemented)* |
-| `}` | Ending of a scope *(not implemented)* |
+| `{` | Beginning of a scope |
+| `}` | End of a scope |

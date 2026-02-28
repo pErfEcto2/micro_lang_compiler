@@ -346,6 +346,66 @@ class TestTokenizerPrintKeyword:
         assert isinstance(tokens[4], SEMICOLON)
 
 
+class TestTokenizerCurlyBrackets:
+    def test_open_bracket(self):
+        from tokenizer.keywords import OPEN_C_BRACKET
+        tokens = Tokenizer("{}").tokenize()
+        assert isinstance(tokens[0], OPEN_C_BRACKET)
+
+    def test_close_bracket(self):
+        from tokenizer.keywords import CLOSE_C_BRACKET
+        tokens = Tokenizer("{}").tokenize()
+        assert len(tokens) == 2
+        assert isinstance(tokens[1], CLOSE_C_BRACKET)
+
+    def test_open_bracket_repr(self):
+        tokens = Tokenizer("{}").tokenize()
+        assert repr(tokens[0]) == "{"
+
+    def test_close_bracket_repr(self):
+        tokens = Tokenizer("{}").tokenize()
+        assert repr(tokens[1]) == "}"
+
+    def test_nested_brackets(self):
+        from tokenizer.keywords import OPEN_C_BRACKET, CLOSE_C_BRACKET
+        tokens = Tokenizer("{ { } }").tokenize()
+        assert len(tokens) == 4
+        assert isinstance(tokens[0], OPEN_C_BRACKET)
+        assert isinstance(tokens[1], OPEN_C_BRACKET)
+        assert isinstance(tokens[2], CLOSE_C_BRACKET)
+        assert isinstance(tokens[3], CLOSE_C_BRACKET)
+
+    def test_brackets_with_statements(self):
+        from tokenizer.keywords import OPEN_C_BRACKET, CLOSE_C_BRACKET, INT64_KEYWORD, ASSIGN_KEYWORD
+        tokens = Tokenizer("{ int64 x = 5; }").tokenize()
+        assert isinstance(tokens[0], OPEN_C_BRACKET)
+        assert isinstance(tokens[1], INT64_KEYWORD)
+        assert isinstance(tokens[-1], CLOSE_C_BRACKET)
+
+    def test_unmatched_open_bracket_raises(self):
+        with pytest.raises(ValueError, match="unmatched"):
+            Tokenizer("{").tokenize()
+
+    def test_unmatched_close_bracket_raises(self):
+        with pytest.raises(ValueError, match="unmatched"):
+            Tokenizer("}").tokenize()
+
+    def test_bracket_line_numbers(self):
+        tokens = Tokenizer("{\n}").tokenize()
+        assert tokens[0].line_number == 1
+        assert tokens[1].line_number == 2
+
+
+class TestTokenizerSlashError:
+    def test_lone_slash_raises(self):
+        with pytest.raises(ValueError, match="invalid syntax"):
+            Tokenizer("/").tokenize()
+
+    def test_slash_followed_by_non_slash_raises(self):
+        with pytest.raises(ValueError, match="invalid syntax"):
+            Tokenizer("/3").tokenize()
+
+
 class TestTokenizerRepr:
     def test_exit_keyword_repr(self):
         tokens = Tokenizer("exit").tokenize()
