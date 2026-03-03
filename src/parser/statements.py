@@ -41,6 +41,16 @@ class INT64_STATEMENT(VARIABLE_TYPE):
     def __str__(self) -> str:
         return f"INT64_STATEMENT(identifier: {self.identifier}, expr: {self.expr})"
 
+class IF_STATEMENT(STATEMENT):
+    def __init__(self, line_number: int, expr: EXPRESSION, true_body: list[STATEMENT], false_body: list[STATEMENT] | None = None) -> None:
+        super().__init__(line_number)
+        self.expr = expr
+        self.true_body: list[STATEMENT] = true_body
+        self.false_body: list[STATEMENT] | None = false_body
+
+    def __str__(self) -> str:
+        return f"IF_STATEMENT(expr: {self.expr}, true_body: {self.true_body}, false_body: {self.false_body})"
+
 class ASSIGN_STATEMENT(STATEMENT):
     def __init__(self, line_number: int, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION) -> None:
         super().__init__(line_number)

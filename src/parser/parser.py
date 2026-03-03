@@ -1,7 +1,7 @@
-from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT, STATEMENT
 from parser.program import PROGRAM
 from parser.expressions import BINARY_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION
-from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_C_BRACKET, CONST_KEYWORD, EXIT_KEYWORD, INT64_KEYWORD, MATH_OPERATION, OPEN_C_BRACKET, PRINT_KEYWORD, SEMICOLON
+from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, ELSE_KEYWORD, EXIT_KEYWORD, IF_KEYWORD, INT64_KEYWORD, MATH_OPERATION, OPEN_BRACKET, OPEN_C_BRACKET, PRINT_KEYWORD, SEMICOLON
 from tokenizer.literals import INT_LITERAL
 from tokenizer.tokens import IDENTIFIER, Token
 
@@ -94,32 +94,65 @@ class Parser:
         self._consume()
         return CONST_STATEMENT(ln, self._parse_int64_statement())
 
+    def _create_statement(self, token) -> STATEMENT | None:
+        match token:
+            case IF_KEYWORD():
+                return self._parse_if_statement(token.line_number)
+            case OPEN_C_BRACKET():
+                return OPEN_C_STATEMENT(token.line_number)
+            case CLOSE_C_BRACKET():
+                return CLOSE_C_STATEMENT(token.line_number)
+            case CONST_KEYWORD():
+                return self._parse_const_statement(token.line_number)
+            case IDENTIFIER():
+                return self._parse_assign_statement(token.line_number, token.val)
+            case EXIT_KEYWORD():
+                return self._parse_exit_statement()
+            case INT64_KEYWORD():
+                return self._parse_int64_statement()
+            case PRINT_KEYWORD():
+                return self._parse_print_statement()
+            case SEMICOLON():
+                return
+            case _:
+                raise ValueError(f"unexpected token '{token}' in line {token.line_number}")
+
+    def _parse_if_statement(self, ln: int) -> IF_STATEMENT:
+        self._assert_current_token_type(OPEN_BRACKET)
+        self._consume()
+
+        expr = self._parse_expr(self._consume())
+        
+        self._assert_current_token_type(CLOSE_BRACKET)
+        self._consume()
+
+        self._assert_current_token_type(OPEN_C_BRACKET)
+
+        true_body = []
+        while self._peek() is not None and type(self._peek()) != CLOSE_C_BRACKET:
+            if (statement := self._create_statement(self._consume())) is not None:
+                true_body.append(statement)
+
+        self._assert_current_token_type(CLOSE_C_BRACKET)
+        true_body.append(self._create_statement(self._consume()))
+
+        false_body = None
+        if type(self._peek()) == ELSE_KEYWORD:
+            self._consume()
+            self._assert_current_token_type(OPEN_C_BRACKET)
+            false_body = []
+            while self._peek() is not None and type(self._peek()) != CLOSE_C_BRACKET:
+                if (statement := self._create_statement(self._consume())) is not None:
+                    false_body.append(statement)
+            self._assert_current_token_type(CLOSE_C_BRACKET)
+            false_body.append(self._create_statement(self._consume()))
+
+        return IF_STATEMENT(ln, expr, true_body, false_body)
+
     def parse(self) -> PROGRAM:
         program: PROGRAM = PROGRAM()
         while self._peek():
             token: Token = self._consume()
-            match token:
-                case OPEN_C_BRACKET():
-                    program.statements.append(OPEN_C_STATEMENT(token.line_number))
-                case CLOSE_C_BRACKET():
-                    program.statements.append(CLOSE_C_STATEMENT(token.line_number))
-                case CONST_KEYWORD():
-                    const_statement = self._parse_const_statement(token.line_number)
-                    program.statements.append(const_statement)
-                case IDENTIFIER():
-                    assign_statemnt = self._parse_assign_statement(token.line_number, token.val)
-                    program.statements.append(assign_statemnt)
-                case EXIT_KEYWORD():
-                    exit_statement = self._parse_exit_statement()
-                    program.statements.append(exit_statement)
-                case INT64_KEYWORD():
-                    int64_statement = self._parse_int64_statement()
-                    program.statements.append(int64_statement)
-                case PRINT_KEYWORD():
-                    print_statement = self._parse_print_statement()
-                    program.statements.append(print_statement)
-                case SEMICOLON():
-                    continue
-                case _:
-                    raise ValueError(f"unexpected token '{token}' in line {token.line_number}")
+            if (statement := self._create_statement(token)) is not None:
+                program.statements.append(statement)
         return program

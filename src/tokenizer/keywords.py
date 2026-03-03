@@ -24,6 +24,20 @@ class SEMICOLON(KEYWORD):
     def __str__(self) -> str:
         return ";"
 
+class OPEN_BRACKET(KEYWORD):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+
+    def __str__(self) -> str:
+        return "("
+
+class CLOSE_BRACKET(KEYWORD):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+
+    def __str__(self) -> str:
+        return ")"
+
 class OPEN_C_BRACKET(KEYWORD):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)
@@ -69,6 +83,22 @@ class PRINT_KEYWORD(KEYWORD):
 
     def __str__(self) -> str:
         return "print"
+
+@register_keyword("if")
+class IF_KEYWORD(KEYWORD):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+
+    def __str__(self) -> str:
+        return "if"
+
+@register_keyword("else")
+class ELSE_KEYWORD(KEYWORD):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+
+    def __str__(self) -> str:
+        return "else"
 
 class ASSIGN_KEYWORD(KEYWORD):
     def __init__(self, line_num: int) -> None:

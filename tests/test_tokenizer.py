@@ -396,6 +396,127 @@ class TestTokenizerCurlyBrackets:
         assert tokens[1].line_number == 2
 
 
+class TestTokenizerParentheses:
+    def test_open_bracket(self):
+        from tokenizer.keywords import OPEN_BRACKET
+        tokens = Tokenizer("(").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], OPEN_BRACKET)
+
+    def test_close_bracket(self):
+        from tokenizer.keywords import CLOSE_BRACKET
+        tokens = Tokenizer("()").tokenize()
+        assert len(tokens) == 2
+        assert isinstance(tokens[1], CLOSE_BRACKET)
+
+    def test_open_bracket_repr(self):
+        tokens = Tokenizer("()").tokenize()
+        assert repr(tokens[0]) == "("
+
+    def test_close_bracket_repr(self):
+        tokens = Tokenizer("()").tokenize()
+        assert repr(tokens[1]) == ")"
+
+    def test_parentheses_in_expression(self):
+        from tokenizer.keywords import OPEN_BRACKET, CLOSE_BRACKET
+        tokens = Tokenizer("(1)").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], OPEN_BRACKET)
+        assert isinstance(tokens[1], INT_LITERAL)
+        assert isinstance(tokens[2], CLOSE_BRACKET)
+
+    def test_parentheses_stop_word_parsing(self):
+        from tokenizer.keywords import OPEN_BRACKET
+        tokens = Tokenizer("if(").tokenize()
+        assert len(tokens) == 2
+        assert tokens[0].val if hasattr(tokens[0], 'val') else str(tokens[0]) == "if"
+        assert isinstance(tokens[1], OPEN_BRACKET)
+
+    def test_parentheses_stop_number_parsing(self):
+        from tokenizer.keywords import CLOSE_BRACKET
+        tokens = Tokenizer("42)").tokenize()
+        assert len(tokens) == 2
+        assert isinstance(tokens[0], INT_LITERAL)
+        assert tokens[0].val == 42
+        assert isinstance(tokens[1], CLOSE_BRACKET)
+
+    def test_parentheses_line_numbers(self):
+        tokens = Tokenizer("(\n)").tokenize()
+        assert tokens[0].line_number == 1
+        assert tokens[1].line_number == 2
+
+
+class TestTokenizerIfElseKeywords:
+    def test_if_keyword(self):
+        from tokenizer.keywords import IF_KEYWORD
+        tokens = Tokenizer("if").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], IF_KEYWORD)
+
+    def test_if_keyword_repr(self):
+        tokens = Tokenizer("if").tokenize()
+        assert repr(tokens[0]) == "if"
+
+    def test_else_keyword(self):
+        from tokenizer.keywords import ELSE_KEYWORD
+        tokens = Tokenizer("else").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], ELSE_KEYWORD)
+
+    def test_else_keyword_repr(self):
+        tokens = Tokenizer("else").tokenize()
+        assert repr(tokens[0]) == "else"
+
+    def test_if_statement_tokens(self):
+        from tokenizer.keywords import IF_KEYWORD, OPEN_BRACKET, CLOSE_BRACKET, OPEN_C_BRACKET, CLOSE_C_BRACKET, PRINT_KEYWORD
+        tokens = Tokenizer("if (1) { print 1; }").tokenize()
+        assert isinstance(tokens[0], IF_KEYWORD)
+        assert isinstance(tokens[1], OPEN_BRACKET)
+        assert isinstance(tokens[2], INT_LITERAL)
+        assert isinstance(tokens[3], CLOSE_BRACKET)
+        assert isinstance(tokens[4], OPEN_C_BRACKET)
+        assert isinstance(tokens[5], PRINT_KEYWORD)
+        assert isinstance(tokens[6], INT_LITERAL)
+        assert isinstance(tokens[7], SEMICOLON)
+        assert isinstance(tokens[8], CLOSE_C_BRACKET)
+
+    def test_if_else_tokens(self):
+        from tokenizer.keywords import IF_KEYWORD, ELSE_KEYWORD, OPEN_BRACKET, CLOSE_BRACKET, OPEN_C_BRACKET, CLOSE_C_BRACKET
+        tokens = Tokenizer("if (1) { } else { }").tokenize()
+        assert isinstance(tokens[0], IF_KEYWORD)
+        assert isinstance(tokens[1], OPEN_BRACKET)
+        assert isinstance(tokens[2], INT_LITERAL)
+        assert isinstance(tokens[3], CLOSE_BRACKET)
+        assert isinstance(tokens[4], OPEN_C_BRACKET)
+        assert isinstance(tokens[5], CLOSE_C_BRACKET)
+        assert isinstance(tokens[6], ELSE_KEYWORD)
+        assert isinstance(tokens[7], OPEN_C_BRACKET)
+        assert isinstance(tokens[8], CLOSE_C_BRACKET)
+
+    def test_if_not_identifier(self):
+        from tokenizer.keywords import IF_KEYWORD
+        tokens = Tokenizer("if").tokenize()
+        assert not isinstance(tokens[0], IDENTIFIER)
+        assert isinstance(tokens[0], IF_KEYWORD)
+
+    def test_else_not_identifier(self):
+        from tokenizer.keywords import ELSE_KEYWORD
+        tokens = Tokenizer("else").tokenize()
+        assert not isinstance(tokens[0], IDENTIFIER)
+        assert isinstance(tokens[0], ELSE_KEYWORD)
+
+    def test_ifdef_is_identifier(self):
+        tokens = Tokenizer("ifdef").tokenize()
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert tokens[0].val == "ifdef"
+
+    def test_if_with_no_space_before_paren(self):
+        from tokenizer.keywords import IF_KEYWORD, OPEN_BRACKET
+        tokens = Tokenizer("if(1){}").tokenize()
+        assert isinstance(tokens[0], IF_KEYWORD)
+        assert isinstance(tokens[1], OPEN_BRACKET)
+
+
 class TestTokenizerSlashError:
     def test_lone_slash_raises(self):
         with pytest.raises(ValueError, match="invalid syntax"):

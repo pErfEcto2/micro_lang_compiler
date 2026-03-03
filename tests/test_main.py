@@ -358,3 +358,170 @@ class TestMainScopeStatement:
                 assert "qword [rbp - 16]" in content
         finally:
             os.unlink(src_path)
+
+
+class TestMainIfStatement:
+    def test_simple_if_creates_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("if (1) { print 42; }")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "cmp rax, 0" in content
+                assert "je .end_0" in content
+                assert "call printf" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_if_else_creates_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("if (0) { print 1; } else { print 2; }")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "je .else_0" in content
+                assert "jmp .end_0" in content
+                assert ".else_0:" in content
+                assert ".end_0:" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_if_with_var_condition(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("int64 x = 1;\nif (x) { print 42; }")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "cmp rax, 0" in content
+                assert "call printf" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_nested_if_else(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("if (1) { if (0) { print 1; } else { print 2; } } else { print 3; }")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert ".else_0:" in content
+                assert ".end_0:" in content
+                assert ".else_1:" in content
+                assert ".end_1:" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_if_with_var_declaration_inside(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("if (1) { int64 x = 42; print x; }")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "sub rsp, 8" in content
+                assert "add rsp, 8" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_verbose_if_shows_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("if (1) { print 1; }")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-v", "-o", out_path, src_path)
+                assert "cmp rax, 0" in result.stdout
+                assert ".end_0:" in result.stdout
+        finally:
+            os.unlink(src_path)
+
+    def test_if_with_assign_in_body(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("int64 x = 0;\nif (1) { x = 42; }\nprint x;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+        finally:
+            os.unlink(src_path)
+
+    def test_multiple_sequential_ifs(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("if (1) { print 1; }\nif (1) { print 2; }\nif (0) { print 3; }")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert ".end_0:" in content
+                assert ".end_1:" in content
+                assert ".end_2:" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_if_with_expression_condition(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("if (1 + 2) { print 99; }")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "add rax, rbx" in content
+                assert "cmp rax, 0" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_if_else_with_exit(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("if (1) { exit 0; } else { exit 1; }")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+        finally:
+            os.unlink(src_path)

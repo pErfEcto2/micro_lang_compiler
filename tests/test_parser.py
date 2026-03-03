@@ -1,9 +1,9 @@
 import pytest
 from parser.parser import Parser
 from parser.program import PROGRAM
-from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT
 from parser.expressions import BINARY_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, STR_EXPRESSION
-from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_C_BRACKET, CONST_KEYWORD, EXIT_KEYWORD, INT64_KEYWORD, MINUS_KEYWORD, MULTIPLY_KEYWORD, OPEN_C_BRACKET, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON
+from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, ELSE_KEYWORD, EXIT_KEYWORD, IF_KEYWORD, INT64_KEYWORD, MINUS_KEYWORD, MULTIPLY_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON
 from tokenizer.literals import INT_LITERAL, STR_LITERAL
 from tokenizer.tokens import IDENTIFIER
 
@@ -579,3 +579,343 @@ class TestParserScopeStatements:
         assert isinstance(program.statements[2], INT64_STATEMENT)
         assert isinstance(program.statements[3], CLOSE_C_STATEMENT)
         assert isinstance(program.statements[4], PRINT_STATEMENT)
+
+
+class TestParserIfStatement:
+    def test_simple_if(self):
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), PRINT_KEYWORD(1), INT_LITERAL(1, 42), SEMICOLON(1),
+            CLOSE_C_BRACKET(1),
+        ]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, IF_STATEMENT)
+        assert isinstance(stmt.expr, INT_EXPRESSION)
+        assert stmt.expr.val == 1
+        assert stmt.false_body is None
+
+    def test_if_has_scope_in_body(self):
+        """if body includes OPEN_C_STATEMENT and CLOSE_C_STATEMENT for scoping"""
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), PRINT_KEYWORD(2), INT_LITERAL(2, 42), SEMICOLON(2),
+            CLOSE_C_BRACKET(3),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt.true_body[0], OPEN_C_STATEMENT)
+        assert isinstance(stmt.true_body[-1], CLOSE_C_STATEMENT)
+
+    def test_if_body_statements(self):
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1),
+            PRINT_KEYWORD(2), INT_LITERAL(2, 10), SEMICOLON(2),
+            PRINT_KEYWORD(3), INT_LITERAL(3, 20), SEMICOLON(3),
+            CLOSE_C_BRACKET(4),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        # body: OPEN_C, PRINT, PRINT, CLOSE_C
+        assert len(stmt.true_body) == 4
+        assert isinstance(stmt.true_body[1], PRINT_STATEMENT)
+        assert isinstance(stmt.true_body[2], PRINT_STATEMENT)
+
+    def test_if_with_identifier_condition(self):
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), IDENTIFIER(1, "x"), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), PRINT_KEYWORD(2), INT_LITERAL(2, 1), SEMICOLON(2),
+            CLOSE_C_BRACKET(3),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt.expr, IDENTIFIER_EXPRESSION)
+        assert stmt.expr.name == "x"
+
+    def test_if_with_binary_condition(self):
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1),
+            INT_LITERAL(1, 1), PLUS_KEYWORD(1), INT_LITERAL(1, 2),
+            CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), PRINT_KEYWORD(2), INT_LITERAL(2, 1), SEMICOLON(2),
+            CLOSE_C_BRACKET(3),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt.expr, BINARY_EXPRESSION)
+
+    def test_if_preserves_line_number(self):
+        tokens = [
+            IF_KEYWORD(5), OPEN_BRACKET(5), INT_LITERAL(5, 1), CLOSE_BRACKET(5),
+            OPEN_C_BRACKET(5), CLOSE_C_BRACKET(6),
+        ]
+        program = Parser(tokens).parse()
+        assert program.statements[0].line_number == 5
+
+    def test_if_empty_body(self):
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, IF_STATEMENT)
+        # body only has OPEN_C and CLOSE_C
+        assert len(stmt.true_body) == 2
+        assert isinstance(stmt.true_body[0], OPEN_C_STATEMENT)
+        assert isinstance(stmt.true_body[1], CLOSE_C_STATEMENT)
+
+    def test_if_repr(self):
+        stmt = IF_STATEMENT(1, INT_EXPRESSION(1, 1), [], None)
+        assert "IF_STATEMENT" in repr(stmt)
+
+    def test_if_missing_open_paren(self):
+        tokens = [
+            IF_KEYWORD(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+        ]
+        with pytest.raises(ValueError, match="expected"):
+            Parser(tokens).parse()
+
+    def test_if_missing_close_paren(self):
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+        ]
+        with pytest.raises(ValueError, match="expected"):
+            Parser(tokens).parse()
+
+    def test_if_missing_open_brace(self):
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            PRINT_KEYWORD(1), INT_LITERAL(1, 1), SEMICOLON(1),
+        ]
+        with pytest.raises(ValueError, match="expected"):
+            Parser(tokens).parse()
+
+    def test_if_followed_by_other_statements(self):
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), PRINT_KEYWORD(2), INT_LITERAL(2, 1), SEMICOLON(2),
+            CLOSE_C_BRACKET(3),
+            PRINT_KEYWORD(4), INT_LITERAL(4, 99), SEMICOLON(4),
+        ]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 2
+        assert isinstance(program.statements[0], IF_STATEMENT)
+        assert isinstance(program.statements[1], PRINT_STATEMENT)
+        assert program.statements[1].expr.val == 99
+
+
+class TestParserIfElseStatement:
+    def test_simple_if_else(self):
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 0), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), PRINT_KEYWORD(2), INT_LITERAL(2, 1), SEMICOLON(2),
+            CLOSE_C_BRACKET(3),
+            ELSE_KEYWORD(3), OPEN_C_BRACKET(3),
+            PRINT_KEYWORD(4), INT_LITERAL(4, 2), SEMICOLON(4),
+            CLOSE_C_BRACKET(5),
+        ]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, IF_STATEMENT)
+        assert stmt.false_body is not None
+
+    def test_if_else_true_body(self):
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), PRINT_KEYWORD(2), INT_LITERAL(2, 10), SEMICOLON(2),
+            CLOSE_C_BRACKET(3),
+            ELSE_KEYWORD(3), OPEN_C_BRACKET(3),
+            PRINT_KEYWORD(4), INT_LITERAL(4, 20), SEMICOLON(4),
+            CLOSE_C_BRACKET(5),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        # true body has: OPEN_C, PRINT(10), CLOSE_C
+        print_stmts = [s for s in stmt.true_body if isinstance(s, PRINT_STATEMENT)]
+        assert len(print_stmts) == 1
+        assert print_stmts[0].expr.val == 10
+
+    def test_if_else_false_body(self):
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 0), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), PRINT_KEYWORD(2), INT_LITERAL(2, 10), SEMICOLON(2),
+            CLOSE_C_BRACKET(3),
+            ELSE_KEYWORD(3), OPEN_C_BRACKET(3),
+            PRINT_KEYWORD(4), INT_LITERAL(4, 20), SEMICOLON(4),
+            CLOSE_C_BRACKET(5),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        print_stmts = [s for s in stmt.false_body if isinstance(s, PRINT_STATEMENT)]
+        assert len(print_stmts) == 1
+        assert print_stmts[0].expr.val == 20
+
+    def test_if_else_both_empty(self):
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+            ELSE_KEYWORD(1), OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, IF_STATEMENT)
+        assert stmt.false_body is not None
+
+    def test_if_else_multiple_statements_in_bodies(self):
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1),
+            PRINT_KEYWORD(2), INT_LITERAL(2, 1), SEMICOLON(2),
+            PRINT_KEYWORD(3), INT_LITERAL(3, 2), SEMICOLON(3),
+            CLOSE_C_BRACKET(4),
+            ELSE_KEYWORD(4), OPEN_C_BRACKET(4),
+            PRINT_KEYWORD(5), INT_LITERAL(5, 3), SEMICOLON(5),
+            PRINT_KEYWORD(6), INT_LITERAL(6, 4), SEMICOLON(6),
+            CLOSE_C_BRACKET(7),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        true_prints = [s for s in stmt.true_body if isinstance(s, PRINT_STATEMENT)]
+        false_prints = [s for s in stmt.false_body if isinstance(s, PRINT_STATEMENT)]
+        assert len(true_prints) == 2
+        assert len(false_prints) == 2
+
+    def test_else_missing_open_brace(self):
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+            ELSE_KEYWORD(1), PRINT_KEYWORD(1), INT_LITERAL(1, 1), SEMICOLON(1),
+        ]
+        with pytest.raises(ValueError, match="expected"):
+            Parser(tokens).parse()
+
+
+class TestParserNestedIf:
+    def test_nested_if_in_true_body(self):
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1),
+            IF_KEYWORD(2), OPEN_BRACKET(2), INT_LITERAL(2, 1), CLOSE_BRACKET(2),
+            OPEN_C_BRACKET(2), PRINT_KEYWORD(3), INT_LITERAL(3, 42), SEMICOLON(3),
+            CLOSE_C_BRACKET(4),
+            CLOSE_C_BRACKET(5),
+        ]
+        program = Parser(tokens).parse()
+        outer = program.statements[0]
+        assert isinstance(outer, IF_STATEMENT)
+        inner_ifs = [s for s in outer.true_body if isinstance(s, IF_STATEMENT)]
+        assert len(inner_ifs) == 1
+        assert inner_ifs[0].false_body is None
+
+    def test_nested_if_else_in_true_body(self):
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1),
+            IF_KEYWORD(2), OPEN_BRACKET(2), INT_LITERAL(2, 0), CLOSE_BRACKET(2),
+            OPEN_C_BRACKET(2), PRINT_KEYWORD(3), INT_LITERAL(3, 1), SEMICOLON(3),
+            CLOSE_C_BRACKET(4),
+            ELSE_KEYWORD(4), OPEN_C_BRACKET(4),
+            PRINT_KEYWORD(5), INT_LITERAL(5, 2), SEMICOLON(5),
+            CLOSE_C_BRACKET(6),
+            CLOSE_C_BRACKET(7),
+        ]
+        program = Parser(tokens).parse()
+        outer = program.statements[0]
+        inner_ifs = [s for s in outer.true_body if isinstance(s, IF_STATEMENT)]
+        assert len(inner_ifs) == 1
+        assert inner_ifs[0].false_body is not None
+
+    def test_nested_if_in_else_body(self):
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 0), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), PRINT_KEYWORD(2), INT_LITERAL(2, 1), SEMICOLON(2),
+            CLOSE_C_BRACKET(3),
+            ELSE_KEYWORD(3), OPEN_C_BRACKET(3),
+            IF_KEYWORD(4), OPEN_BRACKET(4), INT_LITERAL(4, 1), CLOSE_BRACKET(4),
+            OPEN_C_BRACKET(4), PRINT_KEYWORD(5), INT_LITERAL(5, 2), SEMICOLON(5),
+            CLOSE_C_BRACKET(6),
+            CLOSE_C_BRACKET(7),
+        ]
+        program = Parser(tokens).parse()
+        outer = program.statements[0]
+        inner_ifs = [s for s in outer.false_body if isinstance(s, IF_STATEMENT)]
+        assert len(inner_ifs) == 1
+
+
+class TestParserIfIntegration:
+    def test_full_pipeline_simple_if(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("if (1) { print 42; }").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        assert isinstance(program.statements[0], IF_STATEMENT)
+        assert program.statements[0].false_body is None
+
+    def test_full_pipeline_if_else(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("if (0) { print 1; } else { print 2; }").tokenize()
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, IF_STATEMENT)
+        assert stmt.false_body is not None
+
+    def test_full_pipeline_if_with_var_condition(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("int64 x = 1;\nif (x) { print 42; }").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 2
+        assert isinstance(program.statements[0], INT64_STATEMENT)
+        assert isinstance(program.statements[1], IF_STATEMENT)
+        assert isinstance(program.statements[1].expr, IDENTIFIER_EXPRESSION)
+
+    def test_full_pipeline_if_with_expr_condition(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("if (1 + 2) { print 1; }").tokenize()
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt.expr, BINARY_EXPRESSION)
+
+    def test_full_pipeline_nested_if_else(self):
+        from tokenizer.tokenizer import Tokenizer
+        src = "if (1) { if (0) { print 1; } else { print 2; } } else { print 3; }"
+        tokens = Tokenizer(src).tokenize()
+        program = Parser(tokens).parse()
+        outer = program.statements[0]
+        assert isinstance(outer, IF_STATEMENT)
+        assert outer.false_body is not None
+        inner_ifs = [s for s in outer.true_body if isinstance(s, IF_STATEMENT)]
+        assert len(inner_ifs) == 1
+        assert inner_ifs[0].false_body is not None
+
+    def test_full_pipeline_if_with_vars_and_assign(self):
+        from tokenizer.tokenizer import Tokenizer
+        src = "int64 x = 1;\nif (x) {\n  int64 y = 10;\n  print y;\n}"
+        tokens = Tokenizer(src).tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 2
+        assert isinstance(program.statements[1], IF_STATEMENT)
+
+    def test_full_pipeline_multiple_ifs(self):
+        from tokenizer.tokenizer import Tokenizer
+        src = "if (1) { print 1; }\nif (0) { print 2; }"
+        tokens = Tokenizer(src).tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 2
+        assert isinstance(program.statements[0], IF_STATEMENT)
+        assert isinstance(program.statements[1], IF_STATEMENT)
+
+    def test_full_pipeline_if_followed_by_statements(self):
+        from tokenizer.tokenizer import Tokenizer
+        src = "if (1) { print 1; }\nprint 99;\nexit 0;"
+        tokens = Tokenizer(src).tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 3
+        assert isinstance(program.statements[0], IF_STATEMENT)
+        assert isinstance(program.statements[1], PRINT_STATEMENT)
+        assert isinstance(program.statements[2], EXIT_STATEMENT)

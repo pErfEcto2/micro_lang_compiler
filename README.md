@@ -11,7 +11,7 @@ A compiler for a minimal programming language that compiles to x86 assembly (NAS
 - `print` — print Int64 to console
 - `exit` — exit with a return code
 - Arithmetic expressions: `+`, `-`, `*`, `//`, `%`
-- `if/else` — branching *(planned)*
+- `if/else` — conditional branching
 - `while` — loops *(planned)*
 - Comparison: `>`, `<`, `>=`, `<=`, `==`, `!=` *(planned)*
 
@@ -40,6 +40,12 @@ print x;
 
 const int64 y = 42;
 print y;
+
+if (x) {
+  print x;
+} else {
+  print 0;
+}
 
 {
   int64 x = 99;

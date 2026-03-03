@@ -78,6 +78,80 @@ print x;
 
 Output: `10`, `10`, `99`, `10`.
 
+### If / Else
+
+Use `if` for conditional branching. The condition must be in parentheses, and the body must be in curly brackets:
+
+```
+if (1) {
+  print 42;
+}
+```
+
+The condition is truthy if it is non-zero, and falsy if it is zero:
+
+```
+int64 x = 0;
+if (x) {
+  print 1;
+}
+```
+
+This prints nothing because `x` is `0`.
+
+Add an `else` block for the alternative branch:
+
+```
+int64 x = 0;
+if (x) {
+  print 1;
+} else {
+  print 2;
+}
+```
+
+Output: `2`.
+
+You can nest `if`/`else` statements:
+
+```
+int64 x = 0;
+int64 y = 1;
+if (x) {
+  print 1;
+} else {
+  if (y) {
+    print 2;
+  } else {
+    print 3;
+  }
+}
+```
+
+Output: `2`.
+
+Variables declared inside an `if` or `else` block are scoped to that block:
+
+```
+int64 x = 1;
+if (x) {
+  int64 y = 42;
+  print y;
+}
+```
+
+The condition can be any expression:
+
+```
+int64 a = 3;
+int64 b = 2;
+if (a - b) {
+  print 1;
+}
+```
+
+Output: `1` (because `3 - 2 = 1`, which is non-zero).
+
 ### Exit
 
 Exit the program with a return code using `exit`:

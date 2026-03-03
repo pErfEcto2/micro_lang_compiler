@@ -1,7 +1,7 @@
 import pytest
 from compiler.compiler import Compiler
 from parser.program import PROGRAM
-from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT, STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT, STATEMENT
 from parser.expressions import BINARY_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, STR_EXPRESSION
 from tokenizer.keywords import INT_DIVISION_KEYWORD, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD
 
@@ -622,3 +622,406 @@ class TestCompilerScopeStatement:
         result = Compiler(prog).compile()
         assert "    mov qword [rbp - 8], rax" in result
         assert "    mov qword [rbp - 16], rax" in result
+
+    def test_assign_var_shadowing_outer_const(self):
+        """inner var shadows outer const — assigning to inner var should succeed"""
+        const_inner = INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 10))
+        prog = _make_program(
+            CONST_STATEMENT(1, const_inner),
+            OPEN_C_STATEMENT(2),
+            INT64_STATEMENT(3, IDENTIFIER_EXPRESSION(3, "x"), INT_EXPRESSION(3, 20)),
+            ASSIGN_STATEMENT(4, IDENTIFIER_EXPRESSION(4, "x"), INT_EXPRESSION(4, 30)),
+            CLOSE_C_STATEMENT(5),
+        )
+        result = Compiler(prog).compile()
+        assert "    mov qword [rbp - 8], rax" in result   # outer const x
+        assert "    mov qword [rbp - 16], rax" in result  # inner var x (decl + assign)
+
+
+class TestCompilerIfStatement:
+    def test_simple_if_generates_labels(self):
+        prog = _make_program(
+            IF_STATEMENT(1, INT_EXPRESSION(1, 1), [
+                OPEN_C_STATEMENT(1),
+                PRINT_STATEMENT(2, INT_EXPRESSION(2, 42)),
+                CLOSE_C_STATEMENT(3),
+            ]),
+        )
+        result = Compiler(prog).compile()
+        assert ".end_0:" in result
+
+    def test_if_evaluates_condition(self):
+        prog = _make_program(
+            IF_STATEMENT(1, INT_EXPRESSION(1, 5), [
+                OPEN_C_STATEMENT(1),
+                CLOSE_C_STATEMENT(2),
+            ]),
+        )
+        result = Compiler(prog).compile()
+        assert "    push 5" in result
+        assert "    pop rax" in result
+        assert "    cmp rax, 0" in result
+
+    def test_if_without_else_uses_je_to_end(self):
+        prog = _make_program(
+            IF_STATEMENT(1, INT_EXPRESSION(1, 1), [
+                OPEN_C_STATEMENT(1),
+                CLOSE_C_STATEMENT(2),
+            ]),
+        )
+        result = Compiler(prog).compile()
+        assert "    je .end_0" in result
+        assert ".end_0:" in result
+        assert ".else_0:" not in result
+
+    def test_if_with_print_in_body(self):
+        prog = _make_program(
+            IF_STATEMENT(1, INT_EXPRESSION(1, 1), [
+                OPEN_C_STATEMENT(1),
+                PRINT_STATEMENT(2, INT_EXPRESSION(2, 42)),
+                CLOSE_C_STATEMENT(3),
+            ]),
+        )
+        result = Compiler(prog).compile()
+        assert "    call printf" in result
+        assert "    push 42" in result
+
+    def test_if_with_var_condition(self):
+        prog = _make_program(
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 10)),
+            IF_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "x"), [
+                OPEN_C_STATEMENT(2),
+                PRINT_STATEMENT(3, INT_EXPRESSION(3, 1)),
+                CLOSE_C_STATEMENT(4),
+            ]),
+        )
+        result = Compiler(prog).compile()
+        assert "    mov rax, qword [rbp - 8]" in result
+        assert "    cmp rax, 0" in result
+
+    def test_if_with_expression_condition(self):
+        expr = BINARY_EXPRESSION(1, INT_EXPRESSION(1, 3), PLUS_KEYWORD(1), INT_EXPRESSION(1, 4))
+        prog = _make_program(
+            IF_STATEMENT(1, expr, [
+                OPEN_C_STATEMENT(1),
+                CLOSE_C_STATEMENT(2),
+            ]),
+        )
+        result = Compiler(prog).compile()
+        assert "    add rax, rbx" in result
+        assert "    cmp rax, 0" in result
+
+    def test_if_empty_body(self):
+        prog = _make_program(
+            IF_STATEMENT(1, INT_EXPRESSION(1, 1), [
+                OPEN_C_STATEMENT(1),
+                CLOSE_C_STATEMENT(1),
+            ]),
+        )
+        result = Compiler(prog).compile()
+        assert "    je .end_0" in result
+        assert ".end_0:" in result
+
+
+class TestCompilerIfElseStatement:
+    def test_if_else_generates_both_labels(self):
+        prog = _make_program(
+            IF_STATEMENT(1, INT_EXPRESSION(1, 1), [
+                OPEN_C_STATEMENT(1),
+                PRINT_STATEMENT(2, INT_EXPRESSION(2, 10)),
+                CLOSE_C_STATEMENT(3),
+            ], [
+                OPEN_C_STATEMENT(3),
+                PRINT_STATEMENT(4, INT_EXPRESSION(4, 20)),
+                CLOSE_C_STATEMENT(5),
+            ]),
+        )
+        result = Compiler(prog).compile()
+        assert ".else_0:" in result
+        assert ".end_0:" in result
+
+    def test_if_else_uses_je_to_else(self):
+        prog = _make_program(
+            IF_STATEMENT(1, INT_EXPRESSION(1, 1), [
+                OPEN_C_STATEMENT(1),
+                CLOSE_C_STATEMENT(2),
+            ], [
+                OPEN_C_STATEMENT(2),
+                CLOSE_C_STATEMENT(3),
+            ]),
+        )
+        result = Compiler(prog).compile()
+        assert "    je .else_0" in result
+        assert "    jmp .end_0" in result
+
+    def test_if_else_true_body_has_print(self):
+        prog = _make_program(
+            IF_STATEMENT(1, INT_EXPRESSION(1, 1), [
+                OPEN_C_STATEMENT(1),
+                PRINT_STATEMENT(2, INT_EXPRESSION(2, 10)),
+                CLOSE_C_STATEMENT(3),
+            ], [
+                OPEN_C_STATEMENT(3),
+                PRINT_STATEMENT(4, INT_EXPRESSION(4, 20)),
+                CLOSE_C_STATEMENT(5),
+            ]),
+        )
+        result = Compiler(prog).compile()
+        assert "    push 10" in result
+        assert "    push 20" in result
+
+    def test_if_else_both_empty(self):
+        prog = _make_program(
+            IF_STATEMENT(1, INT_EXPRESSION(1, 1), [
+                OPEN_C_STATEMENT(1),
+                CLOSE_C_STATEMENT(1),
+            ], [
+                OPEN_C_STATEMENT(1),
+                CLOSE_C_STATEMENT(1),
+            ]),
+        )
+        result = Compiler(prog).compile()
+        assert "    je .else_0" in result
+        assert ".else_0:" in result
+        assert ".end_0:" in result
+
+    def test_if_else_with_var_declarations(self):
+        prog = _make_program(
+            IF_STATEMENT(1, INT_EXPRESSION(1, 1), [
+                OPEN_C_STATEMENT(1),
+                INT64_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "a"), INT_EXPRESSION(2, 10)),
+                PRINT_STATEMENT(3, IDENTIFIER_EXPRESSION(3, "a")),
+                CLOSE_C_STATEMENT(4),
+            ], [
+                OPEN_C_STATEMENT(4),
+                INT64_STATEMENT(5, IDENTIFIER_EXPRESSION(5, "b"), INT_EXPRESSION(5, 20)),
+                PRINT_STATEMENT(6, IDENTIFIER_EXPRESSION(6, "b")),
+                CLOSE_C_STATEMENT(7),
+            ]),
+        )
+        result = Compiler(prog).compile()
+        assert "    push 10" in result
+        assert "    push 20" in result
+        assert "    call printf" in result
+
+
+class TestCompilerNestedIf:
+    def test_nested_if_generates_separate_labels(self):
+        prog = _make_program(
+            IF_STATEMENT(1, INT_EXPRESSION(1, 1), [
+                OPEN_C_STATEMENT(1),
+                IF_STATEMENT(2, INT_EXPRESSION(2, 1), [
+                    OPEN_C_STATEMENT(2),
+                    PRINT_STATEMENT(3, INT_EXPRESSION(3, 42)),
+                    CLOSE_C_STATEMENT(4),
+                ]),
+                CLOSE_C_STATEMENT(5),
+            ]),
+        )
+        result = Compiler(prog).compile()
+        assert ".end_0:" in result
+        assert ".end_1:" in result
+
+    def test_nested_if_else_in_true_body(self):
+        prog = _make_program(
+            IF_STATEMENT(1, INT_EXPRESSION(1, 1), [
+                OPEN_C_STATEMENT(1),
+                IF_STATEMENT(2, INT_EXPRESSION(2, 0), [
+                    OPEN_C_STATEMENT(2),
+                    PRINT_STATEMENT(3, INT_EXPRESSION(3, 1)),
+                    CLOSE_C_STATEMENT(4),
+                ], [
+                    OPEN_C_STATEMENT(4),
+                    PRINT_STATEMENT(5, INT_EXPRESSION(5, 2)),
+                    CLOSE_C_STATEMENT(6),
+                ]),
+                CLOSE_C_STATEMENT(7),
+            ]),
+        )
+        result = Compiler(prog).compile()
+        assert ".else_1:" in result
+        assert ".end_1:" in result
+        assert ".end_0:" in result
+
+    def test_nested_if_in_else_body(self):
+        prog = _make_program(
+            IF_STATEMENT(1, INT_EXPRESSION(1, 0), [
+                OPEN_C_STATEMENT(1),
+                PRINT_STATEMENT(2, INT_EXPRESSION(2, 1)),
+                CLOSE_C_STATEMENT(3),
+            ], [
+                OPEN_C_STATEMENT(3),
+                IF_STATEMENT(4, INT_EXPRESSION(4, 1), [
+                    OPEN_C_STATEMENT(4),
+                    PRINT_STATEMENT(5, INT_EXPRESSION(5, 2)),
+                    CLOSE_C_STATEMENT(6),
+                ]),
+                CLOSE_C_STATEMENT(7),
+            ]),
+        )
+        result = Compiler(prog).compile()
+        assert ".else_0:" in result
+        assert ".end_0:" in result
+        assert ".end_1:" in result
+
+    def test_multiple_ifs_get_separate_labels(self):
+        prog = _make_program(
+            IF_STATEMENT(1, INT_EXPRESSION(1, 1), [
+                OPEN_C_STATEMENT(1),
+                PRINT_STATEMENT(2, INT_EXPRESSION(2, 1)),
+                CLOSE_C_STATEMENT(3),
+            ]),
+            IF_STATEMENT(4, INT_EXPRESSION(4, 0), [
+                OPEN_C_STATEMENT(4),
+                PRINT_STATEMENT(5, INT_EXPRESSION(5, 2)),
+                CLOSE_C_STATEMENT(6),
+            ]),
+        )
+        result = Compiler(prog).compile()
+        assert ".end_0:" in result
+        assert ".end_1:" in result
+
+
+class TestCompilerIfIntegration:
+    def test_full_pipeline_simple_if(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("if (1) { print 42; }").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    cmp rax, 0" in result
+        assert "    je .end_0" in result
+        assert "    call printf" in result
+        assert ".end_0:" in result
+
+    def test_full_pipeline_if_else(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("if (0) { print 1; } else { print 2; }").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    je .else_0" in result
+        assert "    jmp .end_0" in result
+        assert ".else_0:" in result
+        assert ".end_0:" in result
+
+    def test_full_pipeline_if_with_var(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("int64 x = 1;\nif (x) { print 42; }").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    cmp rax, 0" in result
+        assert "    call printf" in result
+
+    def test_full_pipeline_if_with_expression_condition(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("if (1 + 2) { print 99; }").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    add rax, rbx" in result
+        assert "    cmp rax, 0" in result
+
+    def test_full_pipeline_nested_if_else(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        src = "if (1) { if (0) { print 1; } else { print 2; } } else { print 3; }"
+        tokens = Tokenizer(src).tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert ".else_0:" in result
+        assert ".end_0:" in result
+        assert ".else_1:" in result
+        assert ".end_1:" in result
+
+    def test_full_pipeline_if_with_var_declaration(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("if (1) { int64 x = 42; print x; }").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    sub rsp, 8" in result
+        assert "    add rsp, 8" in result
+        assert "    call printf" in result
+
+    def test_full_pipeline_if_with_outer_var(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("int64 x = 10;\nif (x) { print x; }").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert result.count("    mov rax, qword [rbp - 8]") >= 2
+
+    def test_full_pipeline_if_else_with_assign(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        src = "int64 x = 1;\nif (x) { x = 10; } else { x = 20; }\nprint x;"
+        tokens = Tokenizer(src).tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    call printf" in result
+        assert ".else_0:" in result
+        assert ".end_0:" in result
+
+    def test_full_pipeline_multiple_sequential_ifs(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        src = "if (1) { print 1; }\nif (1) { print 2; }\nif (0) { print 3; }"
+        tokens = Tokenizer(src).tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert ".end_0:" in result
+        assert ".end_1:" in result
+        assert ".end_2:" in result
+
+    def test_full_pipeline_deeply_nested_if(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        src = "if (1) { if (1) { if (1) { print 42; } } }"
+        tokens = Tokenizer(src).tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert ".end_0:" in result
+        assert ".end_1:" in result
+        assert ".end_2:" in result
+        assert "    push 42" in result
+
+
+class TestCompilerIfHelpers:
+    def test_cmp(self):
+        c = Compiler(_make_program())
+        c._cmp("rax", "0")
+        assert "    cmp rax, 0" in c._text_s
+
+    def test_je(self):
+        c = Compiler(_make_program())
+        c._je(".end_0")
+        assert "    je .end_0" in c._text_s
+
+    def test_jmp(self):
+        c = Compiler(_make_program())
+        c._jmp(".end_0")
+        assert "    jmp .end_0" in c._text_s
+
+    def test_label(self):
+        c = Compiler(_make_program())
+        c._label(".end_0")
+        assert ".end_0:" in c._text_s
+
+    def test_gen_label_increments(self):
+        c = Compiler(_make_program())
+        assert c._gen_label() == 0
+        assert c._gen_label() == 1
+        assert c._gen_label() == 2
+

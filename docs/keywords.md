@@ -7,7 +7,7 @@
 | `int64` | Declare an int64 variable |
 | `exit` | Exit a program with given return code |
 | `print` | Print int64 to the console |
-| `if/else` | Branching *(not implemented)* |
+| `if/else` | Conditional branching |
 | `while` | Loop *(not implemented)* |
 | `=` | Assign |
 | `const` | Make a variable constant |
@@ -38,5 +38,9 @@
 | Symbol | Description |
 |--------|-------------|
 | `;` | End of the command |
-| `{` | Beginning of a scope |
-| `}` | End of a scope |
+| `(` | Opening parenthesis (used in `if` conditions) |
+| `)` | Closing parenthesis |
+| `{` | Beginning of a scope / block |
+| `}` | End of a scope / block |
+| `// ...` | Single-line comment *(not implemented)* |
+| `/* ... */` | Multi-line comment *(not implemented)* |

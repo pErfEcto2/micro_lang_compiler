@@ -1,6 +1,6 @@
 from parser.expressions import BINARY_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION
 from parser.program import PROGRAM
-from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT, VARIABLE_TYPE
+from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT, STATEMENT, VARIABLE_TYPE
 from tokenizer.keywords import INT_DIVISION_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD
 
 
@@ -29,12 +29,6 @@ class Scope:
     def has(self, name: str) -> bool:
         return self.has_var(name) or self.has_const(name)
 
-    def get_const(self, name: str) -> int:
-        return self._consts[name]
-
-    def get_var(self, name: str) -> int:
-        return self._vars[name]
-
     def get(self, name: str) -> int:
         if name in self._vars:
             return self._vars[name]
@@ -55,6 +49,11 @@ class Compiler:
         self._asm: list[str] = []
         self._scopes: list[Scope] = [Scope(0)]
         self._qword_size: int = 8
+        self._label_count: int = 0
+
+    def _gen_label(self) -> int:
+        self._label_count += 1
+        return self._label_count - 1
 
     def _add_const(self, name: str) -> None:
         self._scopes[-1].add_const(name)
@@ -68,18 +67,6 @@ class Compiler:
                 return self._qword_size * scope.get(name)
 
         raise ValueError(f"unknown identifier '{name}'")
-
-    def _has_const(self, name: str) -> bool:
-        for scope in self._scopes:
-            if scope.has_const(name):
-                return True
-        return False
-
-    def _has_var(self, name: str) -> bool:
-        for scope in self._scopes:
-            if scope.has_var(name):
-                return True
-        return False
 
     def _has_var_or_const(self, name: str) -> bool:
         for scope in self._scopes:
@@ -149,6 +136,18 @@ class Compiler:
 
     def _call(self, f: str) -> None:
         self._text_s.append(f"    call {f}")
+
+    def _cmp(self, lval: str, rval: str) -> None:
+        self._text_s.append(f"    cmp {lval}, {rval}")
+
+    def _je(self, label: str) -> None:
+        self._text_s.append(f"    je {label}")
+
+    def _jmp(self, label: str) -> None:
+        self._text_s.append(f"    jmp {label}")
+
+    def _label(self, label: str) -> None:
+        self._text_s.append(f"{label}:")
 
     def _eval_expr(self, expr: EXPRESSION) -> None:
         match expr:
@@ -222,9 +221,13 @@ class Compiler:
         self._call("printf")
 
     def _gen_assign(self, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION) -> None:
-        if self._has_const(identifier.name):
-            raise ValueError(f"cant change constant '{identifier.name}' in line {identifier.line_number}")
-        elif not self._has_var(identifier.name):
+        for scope in reversed(self._scopes):
+            if scope.has_const(identifier.name):
+                raise ValueError(f"cant change constant '{identifier.name}' in line {identifier.line_number}")
+
+            if scope.has_var(identifier.name):
+                break
+        else:
             raise ValueError(f"unknown identifier '{identifier.name}' in line {identifier.line_number}")
 
         self._eval_expr(expr)
@@ -239,7 +242,7 @@ class Compiler:
 
         if current_scope.has_var(identifier.name):
             raise ValueError(f"identifier {identifier} already exists (line {identifier.line_number})")
-        elif not self._has_const(identifier.name):
+        elif not current_scope.has_const(identifier.name):
             self._add_const(identifier.name)
         else:
             raise ValueError(f"constant {identifier} already exists (line {identifier.line_number})")
@@ -258,25 +261,54 @@ class Compiler:
         scope = self._scopes.pop()
         self._add("rsp", str(scope.get_size() * self._qword_size))
 
+    def _gen_if(self, expr: EXPRESSION, true_body: list[STATEMENT], false_body: list[STATEMENT] | None = None) -> None:
+        label_id = self._gen_label()
+        else_label = f".else_{label_id}"
+        end_label = f".end_{label_id}"
+
+        self._eval_expr(expr)
+
+        self._pop("rax")
+        self._cmp("rax", "0")
+        if false_body is None:
+            self._je(end_label)
+        else:
+            self._je(else_label)
+        
+        for statement in true_body:
+            self._compile_statement(statement)
+
+        if false_body is not None:
+            self._jmp(end_label)
+            self._label(else_label)
+            for statement in false_body:
+                self._compile_statement(statement)
+        self._label(end_label)
+
+    def _compile_statement(self, statement) -> None:
+        match statement:
+            case IF_STATEMENT():
+                self._gen_if(statement.expr, statement.true_body, statement.false_body)
+            case OPEN_C_STATEMENT():
+                self._add_scope(statement.line_number)
+            case CLOSE_C_STATEMENT():
+                self._remove_scope()
+            case CONST_STATEMENT():
+                self._gen_const(statement.var_statement)
+            case EXIT_STATEMENT():
+                self._gen_exit(statement.return_code)
+            case INT64_STATEMENT():
+                self._gen_int64(statement.identifier, statement.expr)
+            case PRINT_STATEMENT():
+                self._gen_print(statement.expr)
+            case ASSIGN_STATEMENT():
+                self._gen_assign(statement.identifier, statement.expr)
+            case _:
+                raise ValueError(f"unexpected statement '{statement}' in line {statement.line_number}")
+
     def compile(self) -> str:
         for statement in self._ast.statements:
-            match statement:
-                case OPEN_C_STATEMENT():
-                    self._add_scope(statement.line_number)
-                case CLOSE_C_STATEMENT():
-                    self._remove_scope()
-                case CONST_STATEMENT():
-                    self._gen_const(statement.var_statement)
-                case EXIT_STATEMENT():
-                    self._gen_exit(statement.return_code)
-                case INT64_STATEMENT():
-                    self._gen_int64(statement.identifier, statement.expr)
-                case PRINT_STATEMENT():
-                    self._gen_print(statement.expr)
-                case ASSIGN_STATEMENT():
-                    self._gen_assign(statement.identifier, statement.expr)
-                case _:
-                    raise ValueError(f"unexpected statement '{statement}' in line {statement.line_number}")
+            self._compile_statement(statement)
 
         if len(self._scopes) > 1:
             raise ValueError(f"scope was opened in line {self._scopes[-1].line_number}, but never closed")

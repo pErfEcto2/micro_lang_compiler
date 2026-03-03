@@ -1,4 +1,4 @@
-from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_C_BRACKET, INT_DIVISION_KEYWORD, KEYWORDS, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, OPEN_C_BRACKET, PLUS_KEYWORD, SEMICOLON
+from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, INT_DIVISION_KEYWORD, KEYWORDS, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, SEMICOLON
 from tokenizer.literals import INT_LITERAL
 from tokenizer.tokens import Token, IDENTIFIER
 
@@ -9,7 +9,7 @@ class Tokenizer:
         self._src_len: int = len(src_code)
         self._line_num: int = 1
         self._idx: int = 0
-        self._stop_chars: list[str] = [" ", "\n", "\t", ";"]
+        self._stop_chars: list[str] = [" ", "\n", "\t", ";", "(", ")", "{", "}"]
         self._c_brackets: int = 0
 
     def _peek(self, offset: int = 0) -> str | None:
@@ -64,6 +64,10 @@ class Tokenizer:
             elif char == "}":
                 tokens.append(CLOSE_C_BRACKET(self._line_num))
                 self._c_brackets -= 1
+            elif char == "(":
+                tokens.append(OPEN_BRACKET(self._line_num))
+            elif char == ")":
+                tokens.append(CLOSE_BRACKET(self._line_num))
             elif char == "=":
                 tokens.append(ASSIGN_KEYWORD(self._line_num))
             elif char == "+":
