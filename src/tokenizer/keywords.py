@@ -60,6 +60,14 @@ class EXIT_KEYWORD(KEYWORD):
     def __str__(self) -> str:
         return "exit"
 
+@register_keyword("while")
+class WHILE_KEYWORD(KEYWORD):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+
+    def __str__(self) -> str:
+        return "while"
+
 @register_keyword("const")
 class CONST_KEYWORD(KEYWORD):
     def __init__(self, line_num: int) -> None:
@@ -114,7 +122,7 @@ class MATH_OPERATION(KEYWORD):
 class PLUS_KEYWORD(MATH_OPERATION):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)
-        self.bpower: int = 1
+        self.bpower: int = 2
 
     def __str__(self) -> str:
         return "+"
@@ -122,7 +130,7 @@ class PLUS_KEYWORD(MATH_OPERATION):
 class MINUS_KEYWORD(MATH_OPERATION):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)
-        self.bpower: int = 1
+        self.bpower: int = 2
 
     def __str__(self) -> str:
         return "-"
@@ -130,7 +138,7 @@ class MINUS_KEYWORD(MATH_OPERATION):
 class MULTIPLY_KEYWORD(MATH_OPERATION):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)
-        self.bpower: int = 2
+        self.bpower: int = 3
 
     def __str__(self) -> str:
         return "*"
@@ -138,7 +146,7 @@ class MULTIPLY_KEYWORD(MATH_OPERATION):
 class INT_DIVISION_KEYWORD(MATH_OPERATION):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)
-        self.bpower: int = 2
+        self.bpower: int = 3
 
     def __str__(self) -> str:
         return "//"
@@ -146,7 +154,39 @@ class INT_DIVISION_KEYWORD(MATH_OPERATION):
 class MODULO_KEYWORD(MATH_OPERATION):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)
-        self.bpower: int = 2
+        self.bpower: int = 3
 
     def __str__(self) -> str:
         return "%"
+
+class GREATER_KEYWORD(MATH_OPERATION):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+        self.bpower: int = 1
+
+    def __str__(self) -> str:
+        return ">"
+
+class LESS_KEYWORD(MATH_OPERATION):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+        self.bpower: int = 1
+
+    def __str__(self) -> str:
+        return "<"
+
+class GREATER_OR_EQUALS_KEYWORD(MATH_OPERATION):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+        self.bpower: int = 1
+
+    def __str__(self) -> str:
+        return ">="
+
+class LESS_OR_EQUALS_KEYWORD(MATH_OPERATION):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+        self.bpower: int = 1
+
+    def __str__(self) -> str:
+        return "<="

@@ -1,4 +1,4 @@
-from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, INT_DIVISION_KEYWORD, KEYWORDS, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, SEMICOLON
+from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INT_DIVISION_KEYWORD, KEYWORDS, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, SEMICOLON
 from tokenizer.literals import INT_LITERAL
 from tokenizer.tokens import Token, IDENTIFIER
 
@@ -9,7 +9,7 @@ class Tokenizer:
         self._src_len: int = len(src_code)
         self._line_num: int = 1
         self._idx: int = 0
-        self._stop_chars: list[str] = [" ", "\n", "\t", ";", "(", ")", "{", "}"]
+        self._stop_chars: list[str] = [" ", "\n", "\t", ";", "(", ")", "{", "}", "=", "+", "-", "*",  ">", "<", "%", "/"]
         self._c_brackets: int = 0
 
     def _peek(self, offset: int = 0) -> str | None:
@@ -27,7 +27,7 @@ class Tokenizer:
 
             if char.isalpha():
                 word = char
-                while self._peek() and self._peek() not in self._stop_chars:
+                while self._peek() is not None and self._peek() not in self._stop_chars:
                     word += self._consume()
 
                 if word in KEYWORDS:
@@ -68,6 +68,18 @@ class Tokenizer:
                 tokens.append(OPEN_BRACKET(self._line_num))
             elif char == ")":
                 tokens.append(CLOSE_BRACKET(self._line_num))
+            elif char == ">":
+                if self._peek() == "=":
+                    self._consume()
+                    tokens.append(GREATER_OR_EQUALS_KEYWORD(self._line_num))
+                else:
+                    tokens.append(GREATER_KEYWORD(self._line_num))
+            elif char == "<":
+                if self._peek() == "=":
+                    self._consume()
+                    tokens.append(LESS_OR_EQUALS_KEYWORD(self._line_num))
+                else:
+                    tokens.append(LESS_KEYWORD(self._line_num))
             elif char == "=":
                 tokens.append(ASSIGN_KEYWORD(self._line_num))
             elif char == "+":

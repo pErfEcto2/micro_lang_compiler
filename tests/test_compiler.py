@@ -648,7 +648,7 @@ class TestCompilerIfStatement:
             ]),
         )
         result = Compiler(prog).compile()
-        assert ".end_0:" in result
+        assert ".if_end_0:" in result
 
     def test_if_evaluates_condition(self):
         prog = _make_program(
@@ -670,8 +670,8 @@ class TestCompilerIfStatement:
             ]),
         )
         result = Compiler(prog).compile()
-        assert "    je .end_0" in result
-        assert ".end_0:" in result
+        assert "    je .if_end_0" in result
+        assert ".if_end_0:" in result
         assert ".else_0:" not in result
 
     def test_if_with_print_in_body(self):
@@ -719,8 +719,8 @@ class TestCompilerIfStatement:
             ]),
         )
         result = Compiler(prog).compile()
-        assert "    je .end_0" in result
-        assert ".end_0:" in result
+        assert "    je .if_end_0" in result
+        assert ".if_end_0:" in result
 
 
 class TestCompilerIfElseStatement:
@@ -738,7 +738,7 @@ class TestCompilerIfElseStatement:
         )
         result = Compiler(prog).compile()
         assert ".else_0:" in result
-        assert ".end_0:" in result
+        assert ".if_end_0:" in result
 
     def test_if_else_uses_je_to_else(self):
         prog = _make_program(
@@ -752,7 +752,7 @@ class TestCompilerIfElseStatement:
         )
         result = Compiler(prog).compile()
         assert "    je .else_0" in result
-        assert "    jmp .end_0" in result
+        assert "    jmp .if_end_0" in result
 
     def test_if_else_true_body_has_print(self):
         prog = _make_program(
@@ -783,7 +783,7 @@ class TestCompilerIfElseStatement:
         result = Compiler(prog).compile()
         assert "    je .else_0" in result
         assert ".else_0:" in result
-        assert ".end_0:" in result
+        assert ".if_end_0:" in result
 
     def test_if_else_with_var_declarations(self):
         prog = _make_program(
@@ -819,8 +819,8 @@ class TestCompilerNestedIf:
             ]),
         )
         result = Compiler(prog).compile()
-        assert ".end_0:" in result
-        assert ".end_1:" in result
+        assert ".if_end_0:" in result
+        assert ".if_end_1:" in result
 
     def test_nested_if_else_in_true_body(self):
         prog = _make_program(
@@ -840,8 +840,8 @@ class TestCompilerNestedIf:
         )
         result = Compiler(prog).compile()
         assert ".else_1:" in result
-        assert ".end_1:" in result
-        assert ".end_0:" in result
+        assert ".if_end_1:" in result
+        assert ".if_end_0:" in result
 
     def test_nested_if_in_else_body(self):
         prog = _make_program(
@@ -861,8 +861,8 @@ class TestCompilerNestedIf:
         )
         result = Compiler(prog).compile()
         assert ".else_0:" in result
-        assert ".end_0:" in result
-        assert ".end_1:" in result
+        assert ".if_end_0:" in result
+        assert ".if_end_1:" in result
 
     def test_multiple_ifs_get_separate_labels(self):
         prog = _make_program(
@@ -878,8 +878,8 @@ class TestCompilerNestedIf:
             ]),
         )
         result = Compiler(prog).compile()
-        assert ".end_0:" in result
-        assert ".end_1:" in result
+        assert ".if_end_0:" in result
+        assert ".if_end_1:" in result
 
 
 class TestCompilerIfIntegration:
@@ -891,9 +891,9 @@ class TestCompilerIfIntegration:
         prog = Parser(tokens).parse()
         result = Compiler(prog).compile()
         assert "    cmp rax, 0" in result
-        assert "    je .end_0" in result
+        assert "    je .if_end_0" in result
         assert "    call printf" in result
-        assert ".end_0:" in result
+        assert ".if_end_0:" in result
 
     def test_full_pipeline_if_else(self):
         from tokenizer.tokenizer import Tokenizer
@@ -903,9 +903,9 @@ class TestCompilerIfIntegration:
         prog = Parser(tokens).parse()
         result = Compiler(prog).compile()
         assert "    je .else_0" in result
-        assert "    jmp .end_0" in result
+        assert "    jmp .if_end_0" in result
         assert ".else_0:" in result
-        assert ".end_0:" in result
+        assert ".if_end_0:" in result
 
     def test_full_pipeline_if_with_var(self):
         from tokenizer.tokenizer import Tokenizer
@@ -936,9 +936,9 @@ class TestCompilerIfIntegration:
         prog = Parser(tokens).parse()
         result = Compiler(prog).compile()
         assert ".else_0:" in result
-        assert ".end_0:" in result
+        assert ".if_end_0:" in result
         assert ".else_1:" in result
-        assert ".end_1:" in result
+        assert ".if_end_1:" in result
 
     def test_full_pipeline_if_with_var_declaration(self):
         from tokenizer.tokenizer import Tokenizer
@@ -970,7 +970,7 @@ class TestCompilerIfIntegration:
         result = Compiler(prog).compile()
         assert "    call printf" in result
         assert ".else_0:" in result
-        assert ".end_0:" in result
+        assert ".if_end_0:" in result
 
     def test_full_pipeline_multiple_sequential_ifs(self):
         from tokenizer.tokenizer import Tokenizer
@@ -980,9 +980,9 @@ class TestCompilerIfIntegration:
         tokens = Tokenizer(src).tokenize()
         prog = Parser(tokens).parse()
         result = Compiler(prog).compile()
-        assert ".end_0:" in result
-        assert ".end_1:" in result
-        assert ".end_2:" in result
+        assert ".if_end_0:" in result
+        assert ".if_end_1:" in result
+        assert ".if_end_2:" in result
 
     def test_full_pipeline_deeply_nested_if(self):
         from tokenizer.tokenizer import Tokenizer
@@ -992,11 +992,43 @@ class TestCompilerIfIntegration:
         tokens = Tokenizer(src).tokenize()
         prog = Parser(tokens).parse()
         result = Compiler(prog).compile()
-        assert ".end_0:" in result
-        assert ".end_1:" in result
-        assert ".end_2:" in result
+        assert ".if_end_0:" in result
+        assert ".if_end_1:" in result
+        assert ".if_end_2:" in result
         assert "    push 42" in result
 
+
+class TestCompilerWhileStatement:
+    def test_while_body_has_scope_cleanup(self):
+        """While loop body with variable should clean up stack space"""
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        src = "int64 x = 0;\nwhile (x < 3) {\n  int64 y = 1;\n  x = x + 1;\n}"
+        tokens = Tokenizer(src).tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        # The while body declares a variable (sub rsp, 8) so it must
+        # clean up that stack space (add rsp, 8) before looping back
+        body_start = result.index(".while_start_0:")
+        body_end = result.index(".while_end_0:")
+        body = result[body_start:body_end]
+        assert "sub rsp, 8" in body
+        assert "add rsp, 8" in body
+
+    def test_while_with_var_after_loop(self):
+        """Variables declared after a while loop should work correctly"""
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        src = "int64 x = 0;\nwhile (x < 2) {\n  int64 y = 1;\n  x = x + 1;\n}\nint64 z = 99;\nexit z;"
+        tokens = Tokenizer(src).tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        # Should compile without scope corruption
+        assert ".while_start_0:" in result
+        assert ".while_end_0:" in result
+        assert "push 99" in result
 
 class TestCompilerIfHelpers:
     def test_cmp(self):
@@ -1006,18 +1038,18 @@ class TestCompilerIfHelpers:
 
     def test_je(self):
         c = Compiler(_make_program())
-        c._je(".end_0")
-        assert "    je .end_0" in c._text_s
+        c._je(".if_end_0")
+        assert "    je .if_end_0" in c._text_s
 
     def test_jmp(self):
         c = Compiler(_make_program())
-        c._jmp(".end_0")
-        assert "    jmp .end_0" in c._text_s
+        c._jmp(".if_end_0")
+        assert "    jmp .if_end_0" in c._text_s
 
     def test_label(self):
         c = Compiler(_make_program())
-        c._label(".end_0")
-        assert ".end_0:" in c._text_s
+        c._label(".if_end_0")
+        assert ".if_end_0:" in c._text_s
 
     def test_gen_label_increments(self):
         c = Compiler(_make_program())

@@ -553,3 +553,154 @@ class TestTokenizerRepr:
         from tokenizer.literals import STR_LITERAL
         lit = STR_LITERAL(1, "world")
         assert str(lit) == "world"
+
+
+class TestTokenizerWhileKeyword:
+    def test_while_keyword(self):
+        from tokenizer.keywords import WHILE_KEYWORD
+        tokens = Tokenizer("while").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], WHILE_KEYWORD)
+
+    def test_while_keyword_repr(self):
+        tokens = Tokenizer("while").tokenize()
+        assert repr(tokens[0]) == "while"
+
+    def test_while_not_identifier(self):
+        from tokenizer.keywords import WHILE_KEYWORD
+        tokens = Tokenizer("while").tokenize()
+        assert not isinstance(tokens[0], IDENTIFIER)
+        assert isinstance(tokens[0], WHILE_KEYWORD)
+
+    def test_whilevar_is_identifier(self):
+        tokens = Tokenizer("whilevar").tokenize()
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert tokens[0].val == "whilevar"
+
+    def test_while_with_no_space_before_paren(self):
+        from tokenizer.keywords import WHILE_KEYWORD, OPEN_BRACKET
+        tokens = Tokenizer("while(1){}").tokenize()
+        assert isinstance(tokens[0], WHILE_KEYWORD)
+        assert isinstance(tokens[1], OPEN_BRACKET)
+
+    def test_while_statement_tokens(self):
+        from tokenizer.keywords import WHILE_KEYWORD, OPEN_BRACKET, CLOSE_BRACKET, LESS_KEYWORD, OPEN_C_BRACKET, CLOSE_C_BRACKET, PRINT_KEYWORD
+        tokens = Tokenizer("while (i < 10) { print i; }").tokenize()
+        assert isinstance(tokens[0], WHILE_KEYWORD)
+        assert isinstance(tokens[1], OPEN_BRACKET)
+        assert isinstance(tokens[2], IDENTIFIER)
+        assert tokens[2].val == "i"
+        assert isinstance(tokens[3], LESS_KEYWORD)
+        assert isinstance(tokens[4], INT_LITERAL)
+        assert tokens[4].val == 10
+        assert isinstance(tokens[5], CLOSE_BRACKET)
+        assert isinstance(tokens[6], OPEN_C_BRACKET)
+        assert isinstance(tokens[7], PRINT_KEYWORD)
+        assert isinstance(tokens[8], IDENTIFIER)
+        assert tokens[8].val == "i"
+        assert isinstance(tokens[9], SEMICOLON)
+        assert isinstance(tokens[10], CLOSE_C_BRACKET)
+
+
+class TestTokenizerComparisonOperators:
+    def test_greater_than(self):
+        from tokenizer.keywords import GREATER_KEYWORD
+        tokens = Tokenizer(">").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], GREATER_KEYWORD)
+
+    def test_less_than(self):
+        from tokenizer.keywords import LESS_KEYWORD
+        tokens = Tokenizer("<").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], LESS_KEYWORD)
+
+    def test_greater_or_equals(self):
+        from tokenizer.keywords import GREATER_OR_EQUALS_KEYWORD
+        tokens = Tokenizer(">=").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], GREATER_OR_EQUALS_KEYWORD)
+
+    def test_less_or_equals(self):
+        from tokenizer.keywords import LESS_OR_EQUALS_KEYWORD
+        tokens = Tokenizer("<=").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], LESS_OR_EQUALS_KEYWORD)
+
+    def test_greater_repr(self):
+        tokens = Tokenizer(">").tokenize()
+        assert repr(tokens[0]) == ">"
+
+    def test_less_repr(self):
+        tokens = Tokenizer("<").tokenize()
+        assert repr(tokens[0]) == "<"
+
+    def test_greater_or_equals_repr(self):
+        tokens = Tokenizer(">=").tokenize()
+        assert repr(tokens[0]) == ">="
+
+    def test_less_or_equals_repr(self):
+        tokens = Tokenizer("<=").tokenize()
+        assert repr(tokens[0]) == "<="
+
+    def test_comparison_in_expression(self):
+        from tokenizer.keywords import LESS_KEYWORD
+        tokens = Tokenizer("x < 10").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert isinstance(tokens[1], LESS_KEYWORD)
+        assert isinstance(tokens[2], INT_LITERAL)
+
+    def test_comparison_no_spaces(self):
+        from tokenizer.keywords import GREATER_KEYWORD
+        tokens = Tokenizer("x>0").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert tokens[0].val == "x"
+        assert isinstance(tokens[1], GREATER_KEYWORD)
+        assert isinstance(tokens[2], INT_LITERAL)
+        assert tokens[2].val == 0
+
+
+class TestTokenizerStopChars:
+    def test_identifier_modulo_no_spaces(self):
+        from tokenizer.keywords import MODULO_KEYWORD
+        tokens = Tokenizer("x%3;").tokenize()
+        assert len(tokens) == 4
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert tokens[0].val == "x"
+        assert isinstance(tokens[1], MODULO_KEYWORD)
+        assert isinstance(tokens[2], INT_LITERAL)
+        assert tokens[2].val == 3
+        assert isinstance(tokens[3], SEMICOLON)
+
+    def test_identifier_int_division_no_spaces(self):
+        from tokenizer.keywords import INT_DIVISION_KEYWORD
+        tokens = Tokenizer("x//3;").tokenize()
+        assert len(tokens) == 4
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert tokens[0].val == "x"
+        assert isinstance(tokens[1], INT_DIVISION_KEYWORD)
+        assert isinstance(tokens[2], INT_LITERAL)
+        assert tokens[2].val == 3
+        assert isinstance(tokens[3], SEMICOLON)
+
+    def test_number_modulo_no_spaces(self):
+        from tokenizer.keywords import MODULO_KEYWORD
+        tokens = Tokenizer("10%3;").tokenize()
+        assert len(tokens) == 4
+        assert isinstance(tokens[0], INT_LITERAL)
+        assert tokens[0].val == 10
+        assert isinstance(tokens[1], MODULO_KEYWORD)
+        assert isinstance(tokens[2], INT_LITERAL)
+        assert tokens[2].val == 3
+
+    def test_number_int_division_no_spaces(self):
+        from tokenizer.keywords import INT_DIVISION_KEYWORD
+        tokens = Tokenizer("10//3;").tokenize()
+        assert len(tokens) == 4
+        assert isinstance(tokens[0], INT_LITERAL)
+        assert tokens[0].val == 10
+        assert isinstance(tokens[1], INT_DIVISION_KEYWORD)
+        assert isinstance(tokens[2], INT_LITERAL)
+        assert tokens[2].val == 3

@@ -12,8 +12,8 @@ A compiler for a minimal programming language that compiles to x86 assembly (NAS
 - `exit` — exit with a return code
 - Arithmetic expressions: `+`, `-`, `*`, `//`, `%`
 - `if/else` — conditional branching
-- `while` — loops *(planned)*
-- Comparison: `>`, `<`, `>=`, `<=`, `==`, `!=` *(planned)*
+- `while` — loops
+- Comparison: `>`, `<`, `>=`, `<=`
 
 ## Pipeline
 
@@ -53,6 +53,13 @@ if (x) {
 }
 
 print x;
+
+int64 i = 0;
+while (i < 5) {
+  print i;
+  i = i + 1;
+}
+
 exit 0;
 ```
 

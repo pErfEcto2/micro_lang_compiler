@@ -1,7 +1,7 @@
 from parser.expressions import BINARY_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION
 from parser.program import PROGRAM
-from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT, STATEMENT, VARIABLE_TYPE
-from tokenizer.keywords import INT_DIVISION_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD
+from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT, STATEMENT, VARIABLE_TYPE, WHILE_STATEMENT
+from tokenizer.keywords import GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INT_DIVISION_KEYWORD, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD
 
 
 class Scope:
@@ -149,6 +149,21 @@ class Compiler:
     def _label(self, label: str) -> None:
         self._text_s.append(f"{label}:")
 
+    def _setg(self, var: str) -> None:
+        self._text_s.append(f"    setg {var}")
+
+    def _setge(self, var: str) -> None:
+        self._text_s.append(f"    setge {var}")
+
+    def _setl(self, var: str) -> None:
+        self._text_s.append(f"    setl {var}")
+
+    def _setle(self, var: str) -> None:
+        self._text_s.append(f"    setle {var}")
+
+    def _movzx(self, lval: str, rval: str) -> None:
+        self._text_s.append(f"    movzx {lval}, {rval}")
+
     def _eval_expr(self, expr: EXPRESSION) -> None:
         match expr:
             case INT_EXPRESSION():
@@ -175,6 +190,26 @@ class Compiler:
                     case INT_DIVISION_KEYWORD():
                         self._cqo()
                         self._idiv("rbx")
+                        self._push("rax")
+                    case GREATER_KEYWORD():
+                        self._cmp("rax", "rbx")
+                        self._setg("al")
+                        self._movzx("rax", "al")
+                        self._push("rax")
+                    case GREATER_OR_EQUALS_KEYWORD():
+                        self._cmp("rax", "rbx")
+                        self._setge("al")
+                        self._movzx("rax", "al")
+                        self._push("rax")
+                    case  LESS_KEYWORD():
+                        self._cmp("rax", "rbx")
+                        self._setl("al")
+                        self._movzx("rax", "al")
+                        self._push("rax")
+                    case LESS_OR_EQUALS_KEYWORD():
+                        self._cmp("rax", "rbx")
+                        self._setle("al")
+                        self._movzx("rax", "al")
                         self._push("rax")
                     case _:
                         raise ValueError(f"invalid operation type '{type(expr.op)}' ('{MATH_OPERATION}' expected)")
@@ -264,7 +299,7 @@ class Compiler:
     def _gen_if(self, expr: EXPRESSION, true_body: list[STATEMENT], false_body: list[STATEMENT] | None = None) -> None:
         label_id = self._gen_label()
         else_label = f".else_{label_id}"
-        end_label = f".end_{label_id}"
+        end_label = f".if_end_{label_id}"
 
         self._eval_expr(expr)
 
@@ -285,8 +320,28 @@ class Compiler:
                 self._compile_statement(statement)
         self._label(end_label)
 
+    def _gen_while(self, expr: EXPRESSION, body: list[STATEMENT]) ->  None:
+        label_id = self._gen_label()
+        start_label = f".while_start_{label_id}"
+        end_label = f".while_end_{label_id}"
+
+        self._label(start_label)
+        self._eval_expr(expr)
+        self._pop("rax")
+        self._cmp("rax", "0")
+        self._je(end_label)
+
+        for statement in body:
+            self._compile_statement(statement)
+
+        self._jmp(start_label)
+
+        self._label(end_label)
+
     def _compile_statement(self, statement) -> None:
         match statement:
+            case WHILE_STATEMENT():
+                self._gen_while(statement.expr, statement.body)
             case IF_STATEMENT():
                 self._gen_if(statement.expr, statement.true_body, statement.false_body)
             case OPEN_C_STATEMENT():

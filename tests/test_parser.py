@@ -1,9 +1,9 @@
 import pytest
 from parser.parser import Parser
 from parser.program import PROGRAM
-from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT, WHILE_STATEMENT
 from parser.expressions import BINARY_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, STR_EXPRESSION
-from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, ELSE_KEYWORD, EXIT_KEYWORD, IF_KEYWORD, INT64_KEYWORD, MINUS_KEYWORD, MULTIPLY_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON
+from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, ELSE_KEYWORD, EXIT_KEYWORD, IF_KEYWORD, INT64_KEYWORD, LESS_KEYWORD, MINUS_KEYWORD, MULTIPLY_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON, WHILE_KEYWORD
 from tokenizer.literals import INT_LITERAL, STR_LITERAL
 from tokenizer.tokens import IDENTIFIER
 
@@ -400,7 +400,7 @@ class TestParserBinaryExpressions:
         assert expr.rval.rval.val == 3
 
     def test_subtract_same_precedence_as_add(self):
-        # 5 - 3 + 1 → BINARY(5, -, BINARY(3, +, 1)) (right-associative with min_bp + 1)
+        # 5 - 3 + 1 → BINARY(BINARY(5, -, 3), +, 1) (left-associative)
         tokens = [
             EXIT_KEYWORD(1),
             INT_LITERAL(1, 5), MINUS_KEYWORD(1), INT_LITERAL(1, 3), PLUS_KEYWORD(1), INT_LITERAL(1, 1),
@@ -409,11 +409,43 @@ class TestParserBinaryExpressions:
         program = Parser(tokens).parse()
         expr = program.statements[0].return_code
         assert isinstance(expr, BINARY_EXPRESSION)
-        assert isinstance(expr.lval, INT_EXPRESSION)
-        assert expr.lval.val == 5
-        assert isinstance(expr.rval, BINARY_EXPRESSION)
-        assert expr.rval.lval.val == 3
-        assert expr.rval.rval.val == 1
+        assert isinstance(expr.lval, BINARY_EXPRESSION)
+        assert expr.lval.lval.val == 5
+        assert expr.lval.rval.val == 3
+        assert isinstance(expr.rval, INT_EXPRESSION)
+        assert expr.rval.val == 1
+
+    def test_subtraction_is_left_associative(self):
+        # 10 - 3 - 2 → BINARY(BINARY(10, -, 3), -, 2)
+        tokens = [
+            EXIT_KEYWORD(1),
+            INT_LITERAL(1, 10), MINUS_KEYWORD(1), INT_LITERAL(1, 3), MINUS_KEYWORD(1), INT_LITERAL(1, 2),
+            SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        expr = program.statements[0].return_code
+        assert isinstance(expr, BINARY_EXPRESSION)
+        assert isinstance(expr.lval, BINARY_EXPRESSION)
+        assert expr.lval.lval.val == 10
+        assert expr.lval.rval.val == 3
+        assert isinstance(expr.rval, INT_EXPRESSION)
+        assert expr.rval.val == 2
+
+    def test_addition_is_left_associative(self):
+        # 1 + 2 + 3 → BINARY(BINARY(1, +, 2), +, 3)
+        tokens = [
+            EXIT_KEYWORD(1),
+            INT_LITERAL(1, 1), PLUS_KEYWORD(1), INT_LITERAL(1, 2), PLUS_KEYWORD(1), INT_LITERAL(1, 3),
+            SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        expr = program.statements[0].return_code
+        assert isinstance(expr, BINARY_EXPRESSION)
+        assert isinstance(expr.lval, BINARY_EXPRESSION)
+        assert expr.lval.lval.val == 1
+        assert expr.lval.rval.val == 2
+        assert isinstance(expr.rval, INT_EXPRESSION)
+        assert expr.rval.val == 3
 
     def test_binary_expression_repr(self):
         expr = BINARY_EXPRESSION(1, INT_EXPRESSION(1, 10), PLUS_KEYWORD(1), INT_EXPRESSION(1, 20))
@@ -919,3 +951,229 @@ class TestParserIfIntegration:
         assert isinstance(program.statements[0], IF_STATEMENT)
         assert isinstance(program.statements[1], PRINT_STATEMENT)
         assert isinstance(program.statements[2], EXIT_STATEMENT)
+
+
+class TestParserWhileStatement:
+    def test_simple_while(self):
+        tokens = [
+            WHILE_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), PRINT_KEYWORD(2), INT_LITERAL(2, 42), SEMICOLON(2),
+            CLOSE_C_BRACKET(3),
+        ]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, WHILE_STATEMENT)
+
+    def test_while_condition(self):
+        tokens = [
+            WHILE_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 5), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt.expr, INT_EXPRESSION)
+        assert stmt.expr.val == 5
+
+    def test_while_condition_with_comparison(self):
+        tokens = [
+            WHILE_KEYWORD(1), OPEN_BRACKET(1),
+            IDENTIFIER(1, "x"), LESS_KEYWORD(1), INT_LITERAL(1, 10),
+            CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt.expr, BINARY_EXPRESSION)
+
+    def test_while_body_statements(self):
+        tokens = [
+            WHILE_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1),
+            PRINT_KEYWORD(2), INT_LITERAL(2, 1), SEMICOLON(2),
+            PRINT_KEYWORD(3), INT_LITERAL(3, 2), SEMICOLON(3),
+            CLOSE_C_BRACKET(4),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        print_stmts = [s for s in stmt.body if isinstance(s, PRINT_STATEMENT)]
+        assert len(print_stmts) == 2
+        assert print_stmts[0].expr.val == 1
+        assert print_stmts[1].expr.val == 2
+
+    def test_while_empty_body(self):
+        tokens = [
+            WHILE_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 0), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, WHILE_STATEMENT)
+        assert len(stmt.body) == 2
+        assert type(stmt.body[0]) == OPEN_C_STATEMENT
+        assert type(stmt.body[1]) == CLOSE_C_STATEMENT
+
+    def test_while_with_assignment(self):
+        tokens = [
+            WHILE_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1),
+            IDENTIFIER(2, "x"), ASSIGN_KEYWORD(2), INT_LITERAL(2, 10), SEMICOLON(2),
+            CLOSE_C_BRACKET(3),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assign_stmts = [s for s in stmt.body if isinstance(s, ASSIGN_STATEMENT)]
+        assert len(assign_stmts) == 1
+
+    def test_while_with_var_declaration(self):
+        tokens = [
+            WHILE_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1),
+            INT64_KEYWORD(2), IDENTIFIER(2, "y"), ASSIGN_KEYWORD(2), INT_LITERAL(2, 5), SEMICOLON(2),
+            CLOSE_C_BRACKET(3),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        var_stmts = [s for s in stmt.body if isinstance(s, INT64_STATEMENT)]
+        assert len(var_stmts) == 1
+        assert var_stmts[0].identifier.name == "y"
+
+    def test_while_missing_open_paren(self):
+        tokens = [
+            WHILE_KEYWORD(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+        ]
+        with pytest.raises(ValueError, match="expected"):
+            Parser(tokens).parse()
+
+    def test_while_missing_close_paren(self):
+        tokens = [
+            WHILE_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+        ]
+        with pytest.raises(ValueError, match="expected"):
+            Parser(tokens).parse()
+
+    def test_while_missing_open_brace(self):
+        tokens = [
+            WHILE_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            PRINT_KEYWORD(1), INT_LITERAL(1, 1), SEMICOLON(1),
+        ]
+        with pytest.raises(ValueError, match="expected"):
+            Parser(tokens).parse()
+
+    def test_while_repr(self):
+        stmt = WHILE_STATEMENT(1, INT_EXPRESSION(1, 1), [])
+        assert "WHILE_STATEMENT" in repr(stmt)
+
+    def test_while_followed_by_statements(self):
+        tokens = [
+            WHILE_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 0), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+            PRINT_KEYWORD(2), INT_LITERAL(2, 99), SEMICOLON(2),
+        ]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 2
+        assert isinstance(program.statements[0], WHILE_STATEMENT)
+        assert isinstance(program.statements[1], PRINT_STATEMENT)
+        assert program.statements[1].expr.val == 99
+
+
+class TestParserNestedWhile:
+    def test_while_inside_if(self):
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1),
+            WHILE_KEYWORD(2), OPEN_BRACKET(2), INT_LITERAL(2, 0), CLOSE_BRACKET(2),
+            OPEN_C_BRACKET(2), PRINT_KEYWORD(3), INT_LITERAL(3, 1), SEMICOLON(3),
+            CLOSE_C_BRACKET(4),
+            CLOSE_C_BRACKET(5),
+        ]
+        program = Parser(tokens).parse()
+        outer = program.statements[0]
+        assert isinstance(outer, IF_STATEMENT)
+        while_stmts = [s for s in outer.true_body if isinstance(s, WHILE_STATEMENT)]
+        assert len(while_stmts) == 1
+
+    def test_if_inside_while(self):
+        tokens = [
+            WHILE_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1),
+            IF_KEYWORD(2), OPEN_BRACKET(2), INT_LITERAL(2, 1), CLOSE_BRACKET(2),
+            OPEN_C_BRACKET(2), PRINT_KEYWORD(3), INT_LITERAL(3, 42), SEMICOLON(3),
+            CLOSE_C_BRACKET(4),
+            CLOSE_C_BRACKET(5),
+        ]
+        program = Parser(tokens).parse()
+        outer = program.statements[0]
+        assert isinstance(outer, WHILE_STATEMENT)
+        if_stmts = [s for s in outer.body if isinstance(s, IF_STATEMENT)]
+        assert len(if_stmts) == 1
+
+    def test_nested_while(self):
+        tokens = [
+            WHILE_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1),
+            WHILE_KEYWORD(2), OPEN_BRACKET(2), INT_LITERAL(2, 0), CLOSE_BRACKET(2),
+            OPEN_C_BRACKET(2), CLOSE_C_BRACKET(3),
+            CLOSE_C_BRACKET(4),
+        ]
+        program = Parser(tokens).parse()
+        outer = program.statements[0]
+        assert isinstance(outer, WHILE_STATEMENT)
+        inner_whiles = [s for s in outer.body if isinstance(s, WHILE_STATEMENT)]
+        assert len(inner_whiles) == 1
+
+
+class TestParserWhileIntegration:
+    def test_full_pipeline_simple_while(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("while (1) { print 42; }").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        assert isinstance(program.statements[0], WHILE_STATEMENT)
+
+    def test_full_pipeline_while_with_var_and_assign(self):
+        from tokenizer.tokenizer import Tokenizer
+        src = "int64 x = 0;\nwhile (x < 10) {\n  print x;\n  x = x + 1;\n}"
+        tokens = Tokenizer(src).tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 2
+        assert isinstance(program.statements[0], INT64_STATEMENT)
+        stmt = program.statements[1]
+        assert isinstance(stmt, WHILE_STATEMENT)
+        assert isinstance(stmt.expr, BINARY_EXPRESSION)
+        print_stmts = [s for s in stmt.body if isinstance(s, PRINT_STATEMENT)]
+        assert len(print_stmts) == 1
+        assign_stmts = [s for s in stmt.body if isinstance(s, ASSIGN_STATEMENT)]
+        assert len(assign_stmts) == 1
+
+    def test_full_pipeline_while_followed_by_exit(self):
+        from tokenizer.tokenizer import Tokenizer
+        src = "int64 x = 0;\nwhile (x < 5) { x = x + 1; }\nexit x;"
+        tokens = Tokenizer(src).tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 3
+        assert isinstance(program.statements[0], INT64_STATEMENT)
+        assert isinstance(program.statements[1], WHILE_STATEMENT)
+        assert isinstance(program.statements[2], EXIT_STATEMENT)
+
+    def test_full_pipeline_nested_while_in_if(self):
+        from tokenizer.tokenizer import Tokenizer
+        src = "if (1) { while (0) { print 1; } }"
+        tokens = Tokenizer(src).tokenize()
+        program = Parser(tokens).parse()
+        outer = program.statements[0]
+        assert isinstance(outer, IF_STATEMENT)
+        while_stmts = [s for s in outer.true_body if isinstance(s, WHILE_STATEMENT)]
+        assert len(while_stmts) == 1
+
+    def test_full_pipeline_nested_if_in_while(self):
+        from tokenizer.tokenizer import Tokenizer
+        src = "while (1) { if (1) { print 1; } }"
+        tokens = Tokenizer(src).tokenize()
+        program = Parser(tokens).parse()
+        outer = program.statements[0]
+        assert isinstance(outer, WHILE_STATEMENT)
+        if_stmts = [s for s in outer.body if isinstance(s, IF_STATEMENT)]
+        assert len(if_stmts) == 1

@@ -1,7 +1,7 @@
-from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT, STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT, STATEMENT, WHILE_STATEMENT
 from parser.program import PROGRAM
 from parser.expressions import BINARY_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION
-from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, ELSE_KEYWORD, EXIT_KEYWORD, IF_KEYWORD, INT64_KEYWORD, MATH_OPERATION, OPEN_BRACKET, OPEN_C_BRACKET, PRINT_KEYWORD, SEMICOLON
+from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, ELSE_KEYWORD, EXIT_KEYWORD, IF_KEYWORD, INT64_KEYWORD, MATH_OPERATION, OPEN_BRACKET, OPEN_C_BRACKET, PRINT_KEYWORD, SEMICOLON, WHILE_KEYWORD
 from tokenizer.literals import INT_LITERAL
 from tokenizer.tokens import IDENTIFIER, Token
 
@@ -41,7 +41,7 @@ class Parser:
                 break
             
             self._consume()
-            right = self._parse_expr(self._consume(), min_bp + 1)
+            right = self._parse_expr(self._consume(), op.bpower + 1)
             left = BINARY_EXPRESSION(ln, left, op, right)
         
         return left
@@ -88,14 +88,42 @@ class Parser:
         self._consume()
         identifier = IDENTIFIER_EXPRESSION(ln, name)
         expr = self._parse_expr(self._consume())
+        self._assert_current_token_type(SEMICOLON)
+        self._consume()
         return ASSIGN_STATEMENT(expr.line_number, identifier, expr)
 
     def _parse_const_statement(self, ln: int) -> CONST_STATEMENT:
         self._consume()
         return CONST_STATEMENT(ln, self._parse_int64_statement())
 
+    def _parse_while_statement(self, ln: int) -> WHILE_STATEMENT:
+        self._assert_current_token_type(OPEN_BRACKET)
+        self._consume()
+        
+        expr = self._parse_expr(self._consume())
+        
+        self._assert_current_token_type(CLOSE_BRACKET)
+        self._consume()
+        
+        self._assert_current_token_type(OPEN_C_BRACKET)
+        self._consume()
+
+        body = [OPEN_C_STATEMENT(ln)]
+        while self._peek() is not None and type(self._peek()) != CLOSE_C_BRACKET:
+            if (statement := self._create_statement(self._consume())) is not None:
+                body.append(statement)
+
+        body.append(CLOSE_C_STATEMENT(ln))
+
+        self._assert_current_token_type(CLOSE_C_BRACKET)
+        self._consume()
+
+        return WHILE_STATEMENT(ln, expr, body)
+
     def _create_statement(self, token) -> STATEMENT | None:
         match token:
+            case WHILE_KEYWORD():
+                return self._parse_while_statement(token.line_number)
             case IF_KEYWORD():
                 return self._parse_if_statement(token.line_number)
             case OPEN_C_BRACKET():
@@ -140,7 +168,7 @@ class Parser:
         if type(self._peek()) == ELSE_KEYWORD:
             self._consume()
             self._assert_current_token_type(OPEN_C_BRACKET)
-            false_body = []
+            false_body = [self._create_statement(self._consume())]
             while self._peek() is not None and type(self._peek()) != CLOSE_C_BRACKET:
                 if (statement := self._create_statement(self._consume())) is not None:
                     false_body.append(statement)

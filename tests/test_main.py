@@ -374,7 +374,7 @@ class TestMainIfStatement:
                 with open(out_path + ".asm") as f:
                     content = f.read()
                 assert "cmp rax, 0" in content
-                assert "je .end_0" in content
+                assert "je .if_end_0" in content
                 assert "call printf" in content
         finally:
             os.unlink(src_path)
@@ -392,9 +392,9 @@ class TestMainIfStatement:
                 with open(out_path + ".asm") as f:
                     content = f.read()
                 assert "je .else_0" in content
-                assert "jmp .end_0" in content
+                assert "jmp .if_end_0" in content
                 assert ".else_0:" in content
-                assert ".end_0:" in content
+                assert ".if_end_0:" in content
         finally:
             os.unlink(src_path)
 
@@ -428,9 +428,9 @@ class TestMainIfStatement:
                 with open(out_path + ".asm") as f:
                     content = f.read()
                 assert ".else_0:" in content
-                assert ".end_0:" in content
+                assert ".if_end_0:" in content
                 assert ".else_1:" in content
-                assert ".end_1:" in content
+                assert ".if_end_1:" in content
         finally:
             os.unlink(src_path)
 
@@ -461,7 +461,7 @@ class TestMainIfStatement:
                 out_path = os.path.join(tmpdir, "test_out")
                 result = run_compiler("-n", "-v", "-o", out_path, src_path)
                 assert "cmp rax, 0" in result.stdout
-                assert ".end_0:" in result.stdout
+                assert ".if_end_0:" in result.stdout
         finally:
             os.unlink(src_path)
 
@@ -490,9 +490,9 @@ class TestMainIfStatement:
                 assert result.returncode == 0
                 with open(out_path + ".asm") as f:
                     content = f.read()
-                assert ".end_0:" in content
-                assert ".end_1:" in content
-                assert ".end_2:" in content
+                assert ".if_end_0:" in content
+                assert ".if_end_1:" in content
+                assert ".if_end_2:" in content
         finally:
             os.unlink(src_path)
 
@@ -525,3 +525,67 @@ class TestMainIfStatement:
                 assert result.returncode == 0
         finally:
             os.unlink(src_path)
+
+
+def run_executable(src_code, *extra_compiler_args):
+    """Helper: compile a .mil program to an executable, run it, return CompletedProcess."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+        f.write(src_code)
+        src_path = f.name
+
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_path = os.path.join(tmpdir, "test_out")
+            comp = run_compiler("-o", out_path, *extra_compiler_args, src_path)
+            if comp.returncode != 0:
+                raise RuntimeError(f"compilation failed: {comp.stderr or comp.stdout}")
+            return subprocess.run(
+                [out_path],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+    finally:
+        os.unlink(src_path)
+
+
+class TestRuntimeSubtractionAssociativity:
+    def test_chained_subtraction_is_left_associative(self):
+        """10 - 3 - 2 should be (10-3)-2 = 5, not 10-(3-2) = 9"""
+        result = run_executable("exit 10 - 3 - 2;")
+        assert result.returncode == 5
+
+    def test_chained_addition_result(self):
+        """1 + 2 + 3 should be 6 regardless of associativity"""
+        result = run_executable("exit 1 + 2 + 3;")
+        assert result.returncode == 6
+
+    def test_chained_subtraction_four_operands(self):
+        """20 - 5 - 3 - 2 should be ((20-5)-3)-2 = 10"""
+        result = run_executable("exit 20 - 5 - 3 - 2;")
+        assert result.returncode == 10
+
+class TestRuntimeTokenizerStopChars:
+    def test_modulo_without_spaces(self):
+        """x%3 should tokenize as x, %, 3 — not as identifier 'x%3'"""
+        result = run_executable("int64 x = 10;\nexit x%3;")
+        assert result.returncode == 1
+
+    def test_int_division_without_spaces(self):
+        """x//3 should tokenize as x, //, 3 — not as identifier 'x//3'"""
+        result = run_executable("int64 x = 10;\nexit x//3;")
+        assert result.returncode == 3
+
+
+class TestRuntimeWhileScope:
+    def test_while_with_var_does_not_crash(self):
+        """While loop declaring a variable should not segfault from stack leak"""
+        src = "int64 x = 0;\nwhile (x < 100) {\n  int64 y = x;\n  x = x + 1;\n}\nexit x % 256;"
+        result = run_executable(src)
+        assert result.returncode == 100
+
+    def test_while_large_loop_does_not_segfault(self):
+        """A long-running while loop with var decl must not overflow the stack"""
+        src = "int64 x = 0;\nwhile (x < 2000000) {\n  int64 y = x;\n  x = x + 1;\n}\nexit 42;"
+        result = run_executable(src)
+        assert result.returncode == 42

@@ -8,7 +8,7 @@
 | `exit` | Exit a program with given return code |
 | `print` | Print int64 to the console |
 | `if/else` | Conditional branching |
-| `while` | Loop *(not implemented)* |
+| `while` | Loop |
 | `=` | Assign |
 | `const` | Make a variable constant |
 
@@ -22,7 +22,7 @@
 | `//` | Integer division |
 | `%` | Modulo |
 
-## Comparison operators *(not implemented)*
+## Comparison operators
 
 | Operator | Description |
 |----------|-------------|
@@ -30,8 +30,8 @@
 | `<` | Less |
 | `>=` | Greater or equals |
 | `<=` | Less or equals |
-| `==` | Equals |
-| `!=` | Not equals |
+| `==` | Equals *(not implemented)* |
+| `!=` | Not equals *(not implemented)* |
 
 ## Misc
 
@@ -42,5 +42,5 @@
 | `)` | Closing parenthesis |
 | `{` | Beginning of a scope / block |
 | `}` | End of a scope / block |
-| `// ...` | Single-line comment *(not implemented)* |
+| `# ...` | Single-line comment *(not implemented)* |
 | `/* ... */` | Multi-line comment *(not implemented)* |

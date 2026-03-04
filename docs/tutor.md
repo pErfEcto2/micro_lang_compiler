@@ -152,6 +152,45 @@ if (a - b) {
 
 Output: `1` (because `3 - 2 = 1`, which is non-zero).
 
+### While
+
+Use `while` for loops. The condition must be in parentheses, and the body must be in curly brackets:
+
+```
+int64 i = 0;
+while (i < 5) {
+  print i;
+  i = i + 1;
+}
+```
+
+Output: `0`, `1`, `2`, `3`, `4`.
+
+The loop runs as long as the condition is non-zero:
+
+```
+int64 n = 10;
+while (n) {
+  print n;
+  n = n - 1;
+}
+```
+
+Output: `10`, `9`, `8`, `7`, `6`, `5`, `4`, `3`, `2`, `1`.
+
+Variables declared inside a `while` body are scoped to the loop body:
+
+```
+int64 i = 0;
+while (i < 3) {
+  int64 x = i * 10;
+  print x;
+  i = i + 1;
+}
+```
+
+Output: `0`, `10`, `20`.
+
 ### Exit
 
 Exit the program with a return code using `exit`:
@@ -190,6 +229,31 @@ exit a;
 ```
 
 This evaluates `3 * 4` first, then adds `2`, so the exit code is `14`.
+
+### Comparison operators
+
+Four comparison operators are supported: `>`, `<`, `>=`, `<=`. They return `1` for true and `0` for false:
+
+```
+int64 a = 5;
+int64 b = 3;
+print a > b;
+print a < b;
+```
+
+Output: `1`, `0`.
+
+Comparison operators have lower precedence than arithmetic, so `a + 1 < b * 2` evaluates the math first:
+
+```
+int64 a = 2;
+int64 b = 3;
+if (a + 1 >= b) {
+  print 1;
+}
+```
+
+Output: `1` (because `2 + 1 = 3`, and `3 >= 3` is true).
 
 ### Variables in expressions
 
