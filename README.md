@@ -13,7 +13,7 @@ A compiler for a minimal programming language that compiles to x86 assembly (NAS
 - Arithmetic expressions: `+`, `-`, `*`, `//`, `%`
 - `if/else` — conditional branching
 - `while` — loops
-- Comparison: `>`, `<`, `>=`, `<=`
+- Comparison: `>`, `<`, `>=`, `<=`, `==`, `!=`
 - Comments: `# single-line`, `/* multi-line */`
 
 ## Pipeline
@@ -43,8 +43,8 @@ print x;
 const int64 y = 42;
 print y;
 
-if (x) {
-  print x;
+if (x == y) {
+  print 1;
 } else {
   print 0;
 }
@@ -58,7 +58,7 @@ print x;
 
 /* loop from 0 to 4 */
 int64 i = 0;
-while (i < 5) {
+while (i != 5) {
   print i;
   i = i + 1;
 }

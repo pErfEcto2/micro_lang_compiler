@@ -1,7 +1,7 @@
 from parser.expressions import BINARY_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION
 from parser.program import PROGRAM
 from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT, STATEMENT, VARIABLE_TYPE, WHILE_STATEMENT
-from tokenizer.keywords import GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INT_DIVISION_KEYWORD, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD
+from tokenizer.keywords import EQUALS_KEYWORD, GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INT_DIVISION_KEYWORD, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, PLUS_KEYWORD
 
 
 class Scope:
@@ -161,6 +161,12 @@ class Compiler:
     def _setle(self, var: str) -> None:
         self._text_s.append(f"    setle {var}")
 
+    def _sete(self, var: str) -> None:
+        self._text_s.append(f"    sete {var}")
+    
+    def _setne(self, var: str) -> None:
+        self._text_s.append(f"    setne {var}")
+
     def _movzx(self, lval: str, rval: str) -> None:
         self._text_s.append(f"    movzx {lval}, {rval}")
 
@@ -209,6 +215,16 @@ class Compiler:
                     case LESS_OR_EQUALS_KEYWORD():
                         self._cmp("rax", "rbx")
                         self._setle("al")
+                        self._movzx("rax", "al")
+                        self._push("rax")
+                    case EQUALS_KEYWORD():
+                        self._cmp("rax", "rbx")
+                        self._sete("al")
+                        self._movzx("rax", "al")
+                        self._push("rax")
+                    case NOT_EQUALS_KEYWORD():
+                        self._cmp("rax", "rbx")
+                        self._setne("al")
                         self._movzx("rax", "al")
                         self._push("rax")
                     case _:

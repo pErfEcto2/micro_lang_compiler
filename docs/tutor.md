@@ -259,18 +259,20 @@ This evaluates `3 * 4` first, then adds `2`, so the exit code is `14`.
 
 ### Comparison operators
 
-Four comparison operators are supported: `>`, `<`, `>=`, `<=`. They return `1` for true and `0` for false:
+Six comparison operators are supported: `>`, `<`, `>=`, `<=`, `==`, `!=`. They return `1` for true and `0` for false:
 
 ```
 int64 a = 5;
 int64 b = 3;
 print a > b;
 print a < b;
+print a == b;
+print a != b;
 ```
 
-Output: `1`, `0`.
+Output: `1`, `0`, `0`, `1`.
 
-Comparison operators have lower precedence than arithmetic, so `a + 1 < b * 2` evaluates the math first:
+Comparison operators have lower precedence than arithmetic, so `a + 1 < b * 2` evaluates the math first. `==` and `!=` have the lowest precedence among comparisons:
 
 ```
 int64 a = 2;

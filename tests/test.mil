@@ -1,5 +1,29 @@
-int64 a = 123;
+# compute and print a value
+int64 x = 10 + 2 * 4;
+x = x + 1;
+print x;
 
-print 1;
+const int64 y = 42;
+print y;
 
-/* saoheu */
+if (x) {
+  print x;
+} else {
+  print 0;
+}
+
+{
+  int64 x = 99;
+  print x;
+}
+
+print x;
+
+/* loop from 0 to 4 */
+int64 i = 0;
+while (i < 5) {
+  print i;
+  i = i + 1;
+}
+
+exit 0;

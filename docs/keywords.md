@@ -30,8 +30,8 @@
 | `<` | Less |
 | `>=` | Greater or equals |
 | `<=` | Less or equals |
-| `==` | Equals *(not implemented)* |
-| `!=` | Not equals *(not implemented)* |
+| `==` | Equals |
+| `!=` | Not equals |
 
 ## Misc
 

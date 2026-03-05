@@ -3,7 +3,7 @@ from compiler.compiler import Compiler
 from parser.program import PROGRAM
 from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT, STATEMENT
 from parser.expressions import BINARY_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, STR_EXPRESSION
-from tokenizer.keywords import INT_DIVISION_KEYWORD, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, PLUS_KEYWORD
+from tokenizer.keywords import EQUALS_KEYWORD, GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INT_DIVISION_KEYWORD, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, PLUS_KEYWORD
 
 
 def _make_program(*statements):
@@ -260,6 +260,147 @@ class TestCompilerBinaryExpressions:
         result = Compiler(prog).compile()
         assert "    imul rax, rbx" in result
         assert "    add rax, rbx" in result
+
+
+class TestCompilerComparisonExpressions:
+    def test_greater_than(self):
+        expr = BINARY_EXPRESSION(1, INT_EXPRESSION(1, 5), GREATER_KEYWORD(1), INT_EXPRESSION(1, 3))
+        prog = _make_program(EXIT_STATEMENT(1, expr))
+        result = Compiler(prog).compile()
+        assert "    cmp rax, rbx" in result
+        assert "    setg al" in result
+        assert "    movzx rax, al" in result
+
+    def test_less_than(self):
+        expr = BINARY_EXPRESSION(1, INT_EXPRESSION(1, 3), LESS_KEYWORD(1), INT_EXPRESSION(1, 5))
+        prog = _make_program(EXIT_STATEMENT(1, expr))
+        result = Compiler(prog).compile()
+        assert "    cmp rax, rbx" in result
+        assert "    setl al" in result
+        assert "    movzx rax, al" in result
+
+    def test_greater_or_equals(self):
+        expr = BINARY_EXPRESSION(1, INT_EXPRESSION(1, 5), GREATER_OR_EQUALS_KEYWORD(1), INT_EXPRESSION(1, 5))
+        prog = _make_program(EXIT_STATEMENT(1, expr))
+        result = Compiler(prog).compile()
+        assert "    cmp rax, rbx" in result
+        assert "    setge al" in result
+        assert "    movzx rax, al" in result
+
+    def test_less_or_equals(self):
+        expr = BINARY_EXPRESSION(1, INT_EXPRESSION(1, 3), LESS_OR_EQUALS_KEYWORD(1), INT_EXPRESSION(1, 5))
+        prog = _make_program(EXIT_STATEMENT(1, expr))
+        result = Compiler(prog).compile()
+        assert "    cmp rax, rbx" in result
+        assert "    setle al" in result
+        assert "    movzx rax, al" in result
+
+    def test_equals(self):
+        expr = BINARY_EXPRESSION(1, INT_EXPRESSION(1, 5), EQUALS_KEYWORD(1), INT_EXPRESSION(1, 5))
+        prog = _make_program(EXIT_STATEMENT(1, expr))
+        result = Compiler(prog).compile()
+        assert "    cmp rax, rbx" in result
+        assert "    sete al" in result
+        assert "    movzx rax, al" in result
+
+    def test_not_equals(self):
+        expr = BINARY_EXPRESSION(1, INT_EXPRESSION(1, 5), NOT_EQUALS_KEYWORD(1), INT_EXPRESSION(1, 3))
+        prog = _make_program(EXIT_STATEMENT(1, expr))
+        result = Compiler(prog).compile()
+        assert "    cmp rax, rbx" in result
+        assert "    setne al" in result
+        assert "    movzx rax, al" in result
+
+    def test_equals_pushes_result(self):
+        expr = BINARY_EXPRESSION(1, INT_EXPRESSION(1, 1), EQUALS_KEYWORD(1), INT_EXPRESSION(1, 1))
+        prog = _make_program(EXIT_STATEMENT(1, expr))
+        result = Compiler(prog).compile()
+        lines = result.split("\n")
+        movzx_idx = next(i for i, l in enumerate(lines) if "movzx rax, al" in l)
+        assert "push rax" in lines[movzx_idx + 1]
+
+    def test_not_equals_pushes_result(self):
+        expr = BINARY_EXPRESSION(1, INT_EXPRESSION(1, 1), NOT_EQUALS_KEYWORD(1), INT_EXPRESSION(1, 2))
+        prog = _make_program(EXIT_STATEMENT(1, expr))
+        result = Compiler(prog).compile()
+        lines = result.split("\n")
+        movzx_idx = next(i for i, l in enumerate(lines) if "movzx rax, al" in l)
+        assert "push rax" in lines[movzx_idx + 1]
+
+
+class TestCompilerComparisonIntegration:
+    def test_full_pipeline_equals(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("exit 5 == 5;").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    sete al" in result
+        assert "    pop rdi" in result
+
+    def test_full_pipeline_not_equals(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("exit 5 != 3;").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    setne al" in result
+        assert "    pop rdi" in result
+
+    def test_full_pipeline_equals_in_if(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("if (1 == 1) { print 42; }").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    sete al" in result
+        assert "    cmp rax, 0" in result
+        assert "    call printf" in result
+
+    def test_full_pipeline_not_equals_in_if(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("if (1 != 0) { print 42; }").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    setne al" in result
+        assert "    cmp rax, 0" in result
+        assert "    call printf" in result
+
+    def test_full_pipeline_equals_with_vars(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("int64 x = 5;\nint64 y = 5;\nif (x == y) { print 1; }").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    sete al" in result
+        assert "    call printf" in result
+
+    def test_full_pipeline_not_equals_in_while(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("int64 x = 3;\nwhile (x != 0) { x = x - 1; }").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    setne al" in result
+        assert ".while_start_0:" in result
+        assert ".while_end_0:" in result
+
+    def test_equals_lower_precedence_than_arithmetic(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("exit 1 + 2 == 3;").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    add rax, rbx" in result
+        assert "    sete al" in result
 
 
 class TestCompilerInt64Statement:

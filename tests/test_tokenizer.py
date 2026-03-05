@@ -63,12 +63,8 @@ class TestTokenizerLiterals:
         assert tokens[0].val == 999999
 
     def test_number_followed_by_alpha(self):
-        tokens = Tokenizer("123abc").tokenize()
-        assert len(tokens) == 2
-        assert isinstance(tokens[0], INT_LITERAL)
-        assert tokens[0].val == 123
-        assert isinstance(tokens[1], IDENTIFIER)
-        assert tokens[1].val == "abc"
+        with pytest.raises(ValueError, match="invalid syntax in line 1"):
+            Tokenizer("123abc").tokenize()
 
     def test_identifier(self):
         tokens = Tokenizer("foo").tokenize()
@@ -660,6 +656,66 @@ class TestTokenizerComparisonOperators:
         assert isinstance(tokens[1], GREATER_KEYWORD)
         assert isinstance(tokens[2], INT_LITERAL)
         assert tokens[2].val == 0
+
+    def test_equals(self):
+        from tokenizer.keywords import EQUALS_KEYWORD
+        tokens = Tokenizer("==").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], EQUALS_KEYWORD)
+
+    def test_not_equals(self):
+        from tokenizer.keywords import NOT_EQUALS_KEYWORD
+        tokens = Tokenizer("!=").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], NOT_EQUALS_KEYWORD)
+
+    def test_equals_repr(self):
+        tokens = Tokenizer("==").tokenize()
+        assert repr(tokens[0]) == "=="
+
+    def test_not_equals_repr(self):
+        tokens = Tokenizer("!=").tokenize()
+        assert repr(tokens[0]) == "!="
+
+    def test_equals_in_expression(self):
+        from tokenizer.keywords import EQUALS_KEYWORD
+        tokens = Tokenizer("x == 5").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert isinstance(tokens[1], EQUALS_KEYWORD)
+        assert isinstance(tokens[2], INT_LITERAL)
+
+    def test_not_equals_in_expression(self):
+        from tokenizer.keywords import NOT_EQUALS_KEYWORD
+        tokens = Tokenizer("x != 5").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert isinstance(tokens[1], NOT_EQUALS_KEYWORD)
+        assert isinstance(tokens[2], INT_LITERAL)
+
+    def test_equals_no_spaces(self):
+        from tokenizer.keywords import EQUALS_KEYWORD
+        tokens = Tokenizer("x==0").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert tokens[0].val == "x"
+        assert isinstance(tokens[1], EQUALS_KEYWORD)
+        assert isinstance(tokens[2], INT_LITERAL)
+        assert tokens[2].val == 0
+
+    def test_not_equals_no_spaces(self):
+        from tokenizer.keywords import NOT_EQUALS_KEYWORD
+        tokens = Tokenizer("x!=0").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert tokens[0].val == "x"
+        assert isinstance(tokens[1], NOT_EQUALS_KEYWORD)
+        assert isinstance(tokens[2], INT_LITERAL)
+        assert tokens[2].val == 0
+
+    def test_lone_bang_raises(self):
+        with pytest.raises(ValueError, match="invalid syntax"):
+            Tokenizer("!").tokenize()
 
 
 class TestTokenizerSingleLineComment:

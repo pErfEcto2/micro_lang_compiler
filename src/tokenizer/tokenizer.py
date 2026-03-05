@@ -1,4 +1,4 @@
-from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INT_DIVISION_KEYWORD, KEYWORDS, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, SEMICOLON
+from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, EQUALS_KEYWORD, GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INT_DIVISION_KEYWORD, KEYWORDS, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, SEMICOLON
 from tokenizer.literals import INT_LITERAL
 from tokenizer.tokens import Token, IDENTIFIER
 
@@ -9,7 +9,7 @@ class Tokenizer:
         self._src_len: int = len(src_code)
         self._line_num: int = 1
         self._idx: int = 0
-        self._stop_chars: list[str] = [" ", "\n", "\t", ";", "(", ")", "{", "}", "=", "+", "-", "*",  ">", "<", "%", "/"]
+        self._stop_chars: list[str] = [" ", "\n", "\t", ";", "(", ")", "{", "}", "=", "+", "-", "*", ">", "<", "%", "/", "!"]
         self._c_brackets: int = 0
 
     def _peek(self, offset: int = 0) -> str | None:
@@ -38,13 +38,15 @@ class Tokenizer:
             elif char.isdigit():
                 number = char
                 while self._peek() and self._peek() not in self._stop_chars:
+                    if self._peek().isalpha():
+                        raise ValueError(f"invalid syntax in line {self._line_num}")
                     number_char = self._consume()
                     if not number_char.isdigit():
                         self._idx -= 1
                         break
                     number += number_char
                 tokens.append(INT_LITERAL(self._line_num, int(number)))
-            
+ 
             elif char in [" ", "\t"]:
                 pass
 
@@ -72,6 +74,14 @@ class Tokenizer:
             elif char == "{":
                 tokens.append(OPEN_C_BRACKET(self._line_num))
                 self._c_brackets += 1
+
+            elif char == "!":
+                match self._peek():
+                    case "=":
+                        self._consume()
+                        tokens.append(NOT_EQUALS_KEYWORD(self._line_num))
+                    case _:
+                        raise ValueError(f"invalid syntax after '!' in line {self._line_num}")
             
             elif char == "}":
                 tokens.append(CLOSE_C_BRACKET(self._line_num))
@@ -98,7 +108,12 @@ class Tokenizer:
                     tokens.append(LESS_KEYWORD(self._line_num))
             
             elif char == "=":
-                tokens.append(ASSIGN_KEYWORD(self._line_num))
+                match self._peek():
+                    case "=":
+                        self._consume()
+                        tokens.append(EQUALS_KEYWORD(self._line_num))
+                    case _:
+                        tokens.append(ASSIGN_KEYWORD(self._line_num))
             
             elif char == "+":
                 tokens.append(PLUS_KEYWORD(self._line_num))

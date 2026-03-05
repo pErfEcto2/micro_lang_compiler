@@ -3,7 +3,7 @@ from parser.parser import Parser
 from parser.program import PROGRAM
 from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT, WHILE_STATEMENT
 from parser.expressions import BINARY_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, STR_EXPRESSION
-from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, ELSE_KEYWORD, EXIT_KEYWORD, IF_KEYWORD, INT64_KEYWORD, LESS_KEYWORD, MINUS_KEYWORD, MULTIPLY_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON, WHILE_KEYWORD
+from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, ELSE_KEYWORD, EQUALS_KEYWORD, EXIT_KEYWORD, IF_KEYWORD, INT64_KEYWORD, LESS_KEYWORD, MINUS_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON, WHILE_KEYWORD
 from tokenizer.literals import INT_LITERAL, STR_LITERAL
 from tokenizer.tokens import IDENTIFIER
 
@@ -450,6 +450,80 @@ class TestParserBinaryExpressions:
     def test_binary_expression_repr(self):
         expr = BINARY_EXPRESSION(1, INT_EXPRESSION(1, 10), PLUS_KEYWORD(1), INT_EXPRESSION(1, 20))
         assert repr(expr) == "10 + 20"
+
+    def test_equals_expression(self):
+        tokens = [EXIT_KEYWORD(1), INT_LITERAL(1, 5), EQUALS_KEYWORD(1), INT_LITERAL(1, 5), SEMICOLON(1)]
+        program = Parser(tokens).parse()
+        expr = program.statements[0].return_code
+        assert isinstance(expr, BINARY_EXPRESSION)
+        assert expr.lval.val == 5
+        assert expr.rval.val == 5
+
+    def test_not_equals_expression(self):
+        tokens = [EXIT_KEYWORD(1), INT_LITERAL(1, 5), NOT_EQUALS_KEYWORD(1), INT_LITERAL(1, 3), SEMICOLON(1)]
+        program = Parser(tokens).parse()
+        expr = program.statements[0].return_code
+        assert isinstance(expr, BINARY_EXPRESSION)
+        assert expr.lval.val == 5
+        assert expr.rval.val == 3
+
+    def test_equals_lower_precedence_than_arithmetic(self):
+        # 1 + 2 == 3 → BINARY(BINARY(1, +, 2), ==, 3)
+        tokens = [
+            EXIT_KEYWORD(1),
+            INT_LITERAL(1, 1), PLUS_KEYWORD(1), INT_LITERAL(1, 2), EQUALS_KEYWORD(1), INT_LITERAL(1, 3),
+            SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        expr = program.statements[0].return_code
+        assert isinstance(expr, BINARY_EXPRESSION)
+        assert isinstance(expr.lval, BINARY_EXPRESSION)
+        assert expr.lval.lval.val == 1
+        assert expr.lval.rval.val == 2
+        assert isinstance(expr.rval, INT_EXPRESSION)
+        assert expr.rval.val == 3
+
+    def test_not_equals_lower_precedence_than_arithmetic(self):
+        # 1 + 2 != 4 → BINARY(BINARY(1, +, 2), !=, 4)
+        tokens = [
+            EXIT_KEYWORD(1),
+            INT_LITERAL(1, 1), PLUS_KEYWORD(1), INT_LITERAL(1, 2), NOT_EQUALS_KEYWORD(1), INT_LITERAL(1, 4),
+            SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        expr = program.statements[0].return_code
+        assert isinstance(expr, BINARY_EXPRESSION)
+        assert isinstance(expr.lval, BINARY_EXPRESSION)
+        assert isinstance(expr.rval, INT_EXPRESSION)
+        assert expr.rval.val == 4
+
+    def test_equals_same_precedence_as_not_equals(self):
+        # 1 == 2 != 3 → BINARY(BINARY(1, ==, 2), !=, 3) (left-associative)
+        tokens = [
+            EXIT_KEYWORD(1),
+            INT_LITERAL(1, 1), EQUALS_KEYWORD(1), INT_LITERAL(1, 2), NOT_EQUALS_KEYWORD(1), INT_LITERAL(1, 3),
+            SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        expr = program.statements[0].return_code
+        assert isinstance(expr, BINARY_EXPRESSION)
+        assert isinstance(expr.lval, BINARY_EXPRESSION)
+        assert expr.lval.lval.val == 1
+        assert expr.lval.rval.val == 2
+        assert expr.rval.val == 3
+
+    def test_equals_lower_precedence_than_comparison(self):
+        # 1 < 2 == 3 → BINARY(BINARY(1, <, 2), ==, 3)
+        tokens = [
+            EXIT_KEYWORD(1),
+            INT_LITERAL(1, 1), LESS_KEYWORD(1), INT_LITERAL(1, 2), EQUALS_KEYWORD(1), INT_LITERAL(1, 3),
+            SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        expr = program.statements[0].return_code
+        assert isinstance(expr, BINARY_EXPRESSION)
+        assert isinstance(expr.lval, BINARY_EXPRESSION)
+        assert expr.rval.val == 3
 
 
 class TestParserPrintStatement:
