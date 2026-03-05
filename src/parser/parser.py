@@ -93,8 +93,12 @@ class Parser:
         return ASSIGN_STATEMENT(expr.line_number, identifier, expr)
 
     def _parse_const_statement(self, ln: int) -> CONST_STATEMENT:
-        self._consume()
-        return CONST_STATEMENT(ln, self._parse_int64_statement())
+        t = self._consume()
+        match t:
+            case INT64_KEYWORD():
+                return CONST_STATEMENT(ln, self._parse_int64_statement())
+            case _:
+                raise ValueError(f"unknown type '{type(t)}' in line {t.line_number}")
 
     def _parse_while_statement(self, ln: int) -> WHILE_STATEMENT:
         self._assert_current_token_type(OPEN_BRACKET)
@@ -106,9 +110,8 @@ class Parser:
         self._consume()
         
         self._assert_current_token_type(OPEN_C_BRACKET)
-        self._consume()
 
-        body = [OPEN_C_STATEMENT(ln)]
+        body = [self._create_statement(self._consume())]
         while self._peek() is not None and type(self._peek()) != CLOSE_C_BRACKET:
             if (statement := self._create_statement(self._consume())) is not None:
                 body.append(statement)

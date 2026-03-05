@@ -22,7 +22,7 @@ class EXIT_STATEMENT(STATEMENT):
 
 class VARIABLE_TYPE(STATEMENT):
     def __init__(self, line_number: int, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION) -> None:
-        self.line_number: int = line_number
+        super().__init__(line_number)
         self.identifier: IDENTIFIER_EXPRESSION =  identifier
         self.expr: EXPRESSION = expr
 

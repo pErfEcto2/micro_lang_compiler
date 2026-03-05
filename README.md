@@ -14,6 +14,7 @@ A compiler for a minimal programming language that compiles to x86 assembly (NAS
 - `if/else` — conditional branching
 - `while` — loops
 - Comparison: `>`, `<`, `>=`, `<=`
+- Comments: `# single-line`, `/* multi-line */`
 
 ## Pipeline
 
@@ -34,6 +35,7 @@ python src/main.py -v <source.mil>   # verbose: show tokens, AST and assembly
 ## Example
 
 ```
+# compute and print a value
 int64 x = 10 + 2 * 4;
 x = x + 1;
 print x;
@@ -54,6 +56,7 @@ if (x) {
 
 print x;
 
+/* loop from 0 to 4 */
 int64 i = 0;
 while (i < 5) {
   print i;

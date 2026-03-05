@@ -528,7 +528,7 @@ class TestCompilerScopeStatement:
             CLOSE_C_STATEMENT(2),
         )
         result = Compiler(prog).compile()
-        assert "    add rsp, 0" in result
+        assert "    add rsp," not in result
 
     def test_scope_with_var(self):
         prog = _make_program(

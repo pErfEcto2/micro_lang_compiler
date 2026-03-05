@@ -662,6 +662,100 @@ class TestTokenizerComparisonOperators:
         assert tokens[2].val == 0
 
 
+class TestTokenizerSingleLineComment:
+    def test_comment_only(self):
+        tokens = Tokenizer("# hello world").tokenize()
+        assert tokens == []
+
+    def test_comment_is_ignored(self):
+        tokens = Tokenizer("exit 0;\n# this is a comment\nexit 1;").tokenize()
+        assert len(tokens) == 6
+        assert isinstance(tokens[0], EXIT_KEYWORD)
+        assert isinstance(tokens[3], EXIT_KEYWORD)
+
+    def test_comment_at_end_of_file(self):
+        tokens = Tokenizer("exit 0;\n# trailing comment").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], EXIT_KEYWORD)
+
+    def test_comment_preserves_line_numbers(self):
+        tokens = Tokenizer("# comment\nexit 0;").tokenize()
+        assert tokens[0].line_number == 2
+
+    def test_multiple_comments(self):
+        tokens = Tokenizer("# first\n# second\nexit 0;").tokenize()
+        assert len(tokens) == 3
+        assert tokens[0].line_number == 3
+
+    def test_comment_after_statement(self):
+        tokens = Tokenizer("exit 0;\n# comment").tokenize()
+        assert len(tokens) == 3
+
+    def test_comment_does_not_affect_previous_line(self):
+        tokens = Tokenizer("exit 0;\n# comment").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], EXIT_KEYWORD)
+        assert isinstance(tokens[1], INT_LITERAL)
+        assert isinstance(tokens[2], SEMICOLON)
+
+    def test_empty_comment(self):
+        tokens = Tokenizer("#\nexit 0;").tokenize()
+        assert len(tokens) == 3
+        assert tokens[0].line_number == 2
+
+
+class TestTokenizerMultiLineComment:
+    def test_simple_multiline_comment(self):
+        tokens = Tokenizer("/* hello */").tokenize()
+        assert tokens == []
+
+    def test_multiline_comment_is_ignored(self):
+        tokens = Tokenizer("exit 0;\n/* comment */\nexit 1;").tokenize()
+        assert len(tokens) == 6
+        assert isinstance(tokens[0], EXIT_KEYWORD)
+        assert isinstance(tokens[3], EXIT_KEYWORD)
+
+    def test_multiline_comment_spanning_lines(self):
+        tokens = Tokenizer("exit 0;\n/* line1\nline2\nline3 */\nexit 1;").tokenize()
+        assert len(tokens) == 6
+
+    def test_multiline_comment_preserves_line_numbers(self):
+        tokens = Tokenizer("/* comment\nspanning\nlines */\nexit 0;").tokenize()
+        assert tokens[0].line_number == 4
+
+    def test_multiline_comment_between_tokens(self):
+        tokens = Tokenizer("exit /* skip */ 0;").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], EXIT_KEYWORD)
+        assert isinstance(tokens[1], INT_LITERAL)
+        assert tokens[1].val == 0
+        assert isinstance(tokens[2], SEMICOLON)
+
+    def test_unterminated_multiline_comment_raises(self):
+        with pytest.raises(ValueError, match="never closed"):
+            Tokenizer("/* unterminated").tokenize()
+
+    def test_unterminated_multiline_comment_reports_line(self):
+        with pytest.raises(ValueError, match="line 1"):
+            Tokenizer("/* unterminated").tokenize()
+
+    def test_unterminated_multiline_comment_on_later_line(self):
+        with pytest.raises(ValueError, match="line 2"):
+            Tokenizer("exit 0;\n/* unterminated").tokenize()
+
+    def test_multiline_comment_with_stars(self):
+        tokens = Tokenizer("/* ** stars ** */").tokenize()
+        assert tokens == []
+
+    def test_multiline_comment_empty(self):
+        tokens = Tokenizer("/**/").tokenize()
+        assert tokens == []
+
+    def test_multiline_comment_at_end_of_file(self):
+        tokens = Tokenizer("exit 0;\n/* trailing */").tokenize()
+        assert len(tokens) == 3
+
+
 class TestTokenizerStopChars:
     def test_identifier_modulo_no_spaces(self):
         from tokenizer.keywords import MODULO_KEYWORD

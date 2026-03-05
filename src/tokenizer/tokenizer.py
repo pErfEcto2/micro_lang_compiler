@@ -51,47 +51,75 @@ class Tokenizer:
             elif char == "/":
                 match self._peek():
                     case "/":
+                        self._consume()
                         tokens.append(INT_DIVISION_KEYWORD(self._line_num))
+                    case "*":
+                        self._consume()
+                        ln = self._line_num
+                        while not (self._peek() == "*" and self._peek(1) == "/"):
+                            if self._peek() is None:
+                                raise ValueError(f"multiline comment was never closed (opened in line {ln})")
+                            if self._consume() == "\n":
+                                self._line_num += 1
+                        self._consume()
                         self._consume()
                     case _:
                         raise ValueError(f"invalid syntax after '/' in line {self._line_num}")
 
             elif char == "%":
                 tokens.append(MODULO_KEYWORD(self._line_num))
+
             elif char == "{":
                 tokens.append(OPEN_C_BRACKET(self._line_num))
                 self._c_brackets += 1
+            
             elif char == "}":
                 tokens.append(CLOSE_C_BRACKET(self._line_num))
                 self._c_brackets -= 1
+            
             elif char == "(":
                 tokens.append(OPEN_BRACKET(self._line_num))
+            
             elif char == ")":
                 tokens.append(CLOSE_BRACKET(self._line_num))
+            
             elif char == ">":
                 if self._peek() == "=":
                     self._consume()
                     tokens.append(GREATER_OR_EQUALS_KEYWORD(self._line_num))
                 else:
                     tokens.append(GREATER_KEYWORD(self._line_num))
+            
             elif char == "<":
                 if self._peek() == "=":
                     self._consume()
                     tokens.append(LESS_OR_EQUALS_KEYWORD(self._line_num))
                 else:
                     tokens.append(LESS_KEYWORD(self._line_num))
+            
             elif char == "=":
                 tokens.append(ASSIGN_KEYWORD(self._line_num))
+            
             elif char == "+":
                 tokens.append(PLUS_KEYWORD(self._line_num))
+            
             elif char == "-":
                 tokens.append(MINUS_KEYWORD(self._line_num))
+
             elif char == "*":
                 tokens.append(MULTIPLY_KEYWORD(self._line_num))
+            
             elif char == ";":
                 tokens.append(SEMICOLON(self._line_num))
+            
             elif char == "\n":
                 self._line_num += 1
+            
+            elif char == "#":
+                while self._peek() is not None and self._consume() != "\n":
+                    pass
+                self._line_num += 1
+            
             else:
                 raise ValueError(f"unknown character '{char}' in line {self._line_num}")
 

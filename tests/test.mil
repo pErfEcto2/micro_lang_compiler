@@ -1,27 +1,5 @@
-int64 x = 10 + 2 * 4;
-x = x + 1;
-print x;
+int64 a = 123;
 
-const int64 y = 42;
-print y;
+print 1;
 
-if (x) {
-  print x;
-} else {
-  print 0;
-}
-
-{
-  int64 x = 99;
-  print x;
-}
-
-print x;
-
-int64 i = 0;
-while (i < 5) {
-  print i;
-  i = i + 1;
-}
-
-exit 0;
+/* saoheu */

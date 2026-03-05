@@ -42,5 +42,5 @@
 | `)` | Closing parenthesis |
 | `{` | Beginning of a scope / block |
 | `}` | End of a scope / block |
-| `# ...` | Single-line comment *(not implemented)* |
-| `/* ... */` | Multi-line comment *(not implemented)* |
+| `# ...` | Single-line comment |
+| `/* ... */` | Multi-line comment |

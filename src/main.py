@@ -16,7 +16,7 @@ parser.add_argument("src", help="path to the file with a source code")
 
 args = parser.parse_args()
 
-N = 100
+BANNER_WIDTH = 100
 
 if not os.path.exists(args.src):
     print(f"no such file or directory: {args.src}")
@@ -26,7 +26,7 @@ with open(args.src, "r") as src_f:
     src_code = src_f.read()
 
 if args.verbose:
-    print("SOURCE CODE".center(N, "="))
+    print("SOURCE CODE".center(BANNER_WIDTH, "="))
     print(src_code)
     print()
 
@@ -34,7 +34,7 @@ tokenizer = Tokenizer(src_code)
 tokens = tokenizer.tokenize()
 
 if args.verbose:
-    print("TOKENS".center(N, "="))
+    print("TOKENS".center(BANNER_WIDTH, "="))
     print(tokens)
     print()
 
@@ -42,7 +42,7 @@ ast_parser = Parser(tokens)
 ast_tree = ast_parser.parse()
 
 if args.verbose:
-    print("AST TREE".center(N, "="))
+    print("AST TREE".center(BANNER_WIDTH, "="))
     print(ast_tree)
     print()
 
@@ -50,7 +50,7 @@ compiler = Compiler(ast_tree)
 compiled_code = compiler.compile()
 
 if args.verbose:
-    print("ASM INSRUCTIONS".center(N, "="))
+    print("ASM INSTRUCTIONS".center(BANNER_WIDTH, "="))
     print(compiled_code)
     print()
 

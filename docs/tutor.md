@@ -207,6 +207,33 @@ int64 x = 100;
 exit x - 50;
 ```
 
+## Comments
+
+### Single-line comments
+
+Use `#` to start a single-line comment. Everything after `#` until the end of the line is ignored:
+
+```
+# this is a comment
+int64 x = 5; # this part is not valid here — put comments on their own line
+```
+
+### Multi-line comments
+
+Use `/* ... */` for comments spanning multiple lines:
+
+```
+/* this is a
+   multi-line comment */
+int64 x = 5;
+```
+
+Multi-line comments can also be used inline:
+
+```
+exit /* the return code */ 0;
+```
+
 ## Expressions
 
 ### Integer literals

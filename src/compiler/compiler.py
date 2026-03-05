@@ -222,9 +222,7 @@ class Compiler:
                 self._push("rax")
 
             case _:
-                raise ValueError(f"unexpected expression '{expr}' for 'exit' in line {expr.line_number}")
-
-        return
+                raise ValueError(f"unexpected expression '{expr}' in line {expr.line_number}")
 
     def _gen_exit(self, ret_code_expr: EXPRESSION) -> None:
         self._eval_expr(ret_code_expr)
@@ -294,7 +292,8 @@ class Compiler:
 
     def _remove_scope(self) -> None:
         scope = self._scopes.pop()
-        self._add("rsp", str(scope.get_size() * self._qword_size))
+        if scope.get_size() > 0:
+            self._add("rsp", str(scope.get_size() * self._qword_size))
 
     def _gen_if(self, expr: EXPRESSION, true_body: list[STATEMENT], false_body: list[STATEMENT] | None = None) -> None:
         label_id = self._gen_label()
