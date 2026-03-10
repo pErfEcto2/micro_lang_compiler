@@ -1,9 +1,9 @@
 import pytest
 from compiler.compiler import Compiler
 from parser.program import PROGRAM
-from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT, STATEMENT
-from parser.expressions import BINARY_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, STR_EXPRESSION
-from tokenizer.keywords import EQUALS_KEYWORD, GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INT_DIVISION_KEYWORD, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, PLUS_KEYWORD
+from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT
+from parser.expressions import BINARY_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION, STR_EXPRESSION
+from tokenizer.keywords import DECREMENT_KEYWORD, EQUALS_KEYWORD, GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INCREMENT_KEYWORD, INT_DIVISION_KEYWORD, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, PLUS_KEYWORD
 
 
 def _make_program(*statements):
@@ -1197,4 +1197,142 @@ class TestCompilerIfHelpers:
         assert c._gen_label() == 0
         assert c._gen_label() == 1
         assert c._gen_label() == 2
+
+
+class TestCompilerPostfixStatement:
+    def test_postfix_increment_emits_inc(self):
+        prog = _make_program(
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 0)),
+            POSTFIX_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INCREMENT_KEYWORD(1)),
+        )
+        result = Compiler(prog).compile()
+        assert "inc qword [rbp - 8]" in result
+
+    def test_postfix_decrement_emits_dec(self):
+        prog = _make_program(
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 0)),
+            POSTFIX_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), DECREMENT_KEYWORD(1)),
+        )
+        result = Compiler(prog).compile()
+        assert "dec qword [rbp - 8]" in result
+
+    def test_postfix_on_undeclared_var_raises(self):
+        prog = _make_program(
+            POSTFIX_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INCREMENT_KEYWORD(1)),
+        )
+        with pytest.raises(ValueError, match="unknown identifier"):
+            Compiler(prog).compile()
+
+    def test_postfix_on_const_raises(self):
+        prog = _make_program(
+            CONST_STATEMENT(1, INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5))),
+            POSTFIX_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INCREMENT_KEYWORD(1)),
+        )
+        with pytest.raises(ValueError, match="constant"):
+            Compiler(prog).compile()
+
+
+class TestCompilerPrefixStatement:
+    def test_prefix_increment_emits_inc(self):
+        prog = _make_program(
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 0)),
+            PREFIX_STATEMENT(1, INCREMENT_KEYWORD(1), IDENTIFIER_EXPRESSION(1, "x")),
+        )
+        result = Compiler(prog).compile()
+        assert "inc qword [rbp - 8]" in result
+
+    def test_prefix_decrement_emits_dec(self):
+        prog = _make_program(
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 0)),
+            PREFIX_STATEMENT(1, DECREMENT_KEYWORD(1), IDENTIFIER_EXPRESSION(1, "x")),
+        )
+        result = Compiler(prog).compile()
+        assert "dec qword [rbp - 8]" in result
+
+    def test_prefix_on_undeclared_var_raises(self):
+        prog = _make_program(
+            PREFIX_STATEMENT(1, INCREMENT_KEYWORD(1), IDENTIFIER_EXPRESSION(1, "x")),
+        )
+        with pytest.raises(ValueError, match="unknown identifier"):
+            Compiler(prog).compile()
+
+    def test_prefix_on_const_raises(self):
+        prog = _make_program(
+            CONST_STATEMENT(1, INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5))),
+            PREFIX_STATEMENT(1, INCREMENT_KEYWORD(1), IDENTIFIER_EXPRESSION(1, "x")),
+        )
+        with pytest.raises(ValueError, match="constant"):
+            Compiler(prog).compile()
+
+
+class TestCompilerPostfixExpression:
+    def test_postfix_increment_expr_pushes_old_value_then_increments(self):
+        prog = _make_program(
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5)),
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "a"), POSTFIX_EXPRESSION(1, IDENTIFIER_EXPRESSION(1, "x"), INCREMENT_KEYWORD(1))),
+        )
+        result = Compiler(prog).compile()
+        lines = result.split("\n")
+        text = "\n".join(lines)
+        assert "push qword [rbp - 8]" in text
+        assert "inc qword [rbp - 8]" in text
+
+    def test_postfix_decrement_expr_emits_dec(self):
+        prog = _make_program(
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5)),
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "a"), POSTFIX_EXPRESSION(1, IDENTIFIER_EXPRESSION(1, "x"), DECREMENT_KEYWORD(1))),
+        )
+        result = Compiler(prog).compile()
+        assert "dec qword [rbp - 8]" in result
+
+    def test_postfix_expr_on_const_raises(self):
+        prog = _make_program(
+            CONST_STATEMENT(1, INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5))),
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "a"), POSTFIX_EXPRESSION(1, IDENTIFIER_EXPRESSION(1, "x"), INCREMENT_KEYWORD(1))),
+        )
+        with pytest.raises(ValueError, match="constant"):
+            Compiler(prog).compile()
+
+    def test_postfix_expr_on_undeclared_raises(self):
+        prog = _make_program(
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "a"), POSTFIX_EXPRESSION(1, IDENTIFIER_EXPRESSION(1, "x"), INCREMENT_KEYWORD(1))),
+        )
+        with pytest.raises(ValueError, match="unknown identifier"):
+            Compiler(prog).compile()
+
+
+class TestCompilerPrefixExpression:
+    def test_prefix_increment_expr_increments_then_pushes(self):
+        prog = _make_program(
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5)),
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "a"), PREFIX_EXPRESSION(1, INCREMENT_KEYWORD(1), IDENTIFIER_EXPRESSION(1, "x"))),
+        )
+        result = Compiler(prog).compile()
+        lines = result.split("\n")
+        text = "\n".join(lines)
+        assert "inc qword [rbp - 8]" in text
+        assert "push qword [rbp - 8]" in text
+
+    def test_prefix_decrement_expr_emits_dec(self):
+        prog = _make_program(
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5)),
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "a"), PREFIX_EXPRESSION(1, DECREMENT_KEYWORD(1), IDENTIFIER_EXPRESSION(1, "x"))),
+        )
+        result = Compiler(prog).compile()
+        assert "dec qword [rbp - 8]" in result
+
+    def test_prefix_expr_on_const_raises(self):
+        prog = _make_program(
+            CONST_STATEMENT(1, INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5))),
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "a"), PREFIX_EXPRESSION(1, INCREMENT_KEYWORD(1), IDENTIFIER_EXPRESSION(1, "x"))),
+        )
+        with pytest.raises(ValueError, match="constant"):
+            Compiler(prog).compile()
+
+    def test_prefix_expr_on_undeclared_raises(self):
+        prog = _make_program(
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "a"), PREFIX_EXPRESSION(1, INCREMENT_KEYWORD(1), IDENTIFIER_EXPRESSION(1, "x"))),
+        )
+        with pytest.raises(ValueError, match="unknown identifier"):
+            Compiler(prog).compile()
 

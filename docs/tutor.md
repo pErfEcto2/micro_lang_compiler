@@ -48,6 +48,45 @@ x = 10;
 x = x + 1;
 ```
 
+### Increment / Decrement
+
+Use `++` and `--` to increment or decrement a variable by 1. Both prefix and postfix forms are supported:
+
+```
+int64 x = 5;
+x++;
+++x;
+x--;
+--x;
+```
+
+When used as an expression, postfix returns the old value and prefix returns the new value:
+
+```
+int64 x = 5;
+int64 a = x++;
+print a;
+print x;
+```
+
+Output: `5`, `6`.
+
+```
+int64 y = 5;
+int64 b = ++y;
+print b;
+print y;
+```
+
+Output: `6`, `6`.
+
+Increment and decrement cannot be used on constants:
+
+```
+const int64 x = 5;
+x++;  // error: cant change constant 'x'
+```
+
 ### Print
 
 Print an integer value to the console using `print`:
@@ -160,7 +199,7 @@ Use `while` for loops. The condition must be in parentheses, and the body must b
 int64 i = 0;
 while (i < 5) {
   print i;
-  i = i + 1;
+  i++;
 }
 ```
 
@@ -172,7 +211,7 @@ The loop runs as long as the condition is non-zero:
 int64 n = 10;
 while (n) {
   print n;
-  n = n - 1;
+  n--;
 }
 ```
 

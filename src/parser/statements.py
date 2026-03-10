@@ -1,5 +1,6 @@
 from parser.ast_node import ASTNode
 from parser.expressions import EXPRESSION, IDENTIFIER_EXPRESSION
+from tokenizer.keywords import UNARY_MATH_OPERATION
 
 
 class STATEMENT(ASTNode):
@@ -75,6 +76,24 @@ class OPEN_C_STATEMENT(STATEMENT):
 
     def __str__(self) -> str:
         return "OPEN_C_STATEMENT"
+
+class POSTFIX_STATEMENT(STATEMENT):
+    def __init__(self, line_number: int, identifier: IDENTIFIER_EXPRESSION, op: UNARY_MATH_OPERATION) -> None:
+        super().__init__(line_number)
+        self.identifier: IDENTIFIER_EXPRESSION = identifier
+        self.op: UNARY_MATH_OPERATION = op
+
+    def __str__(self) -> str:
+        return f"POSTFIX_STATEMENT(identifier: {self.identifier}, op: {self.op})"
+
+class PREFIX_STATEMENT(STATEMENT):
+    def __init__(self, line_number: int, op: UNARY_MATH_OPERATION, identifier: IDENTIFIER_EXPRESSION) -> None:
+        super().__init__(line_number)
+        self.identifier: IDENTIFIER_EXPRESSION = identifier
+        self.op: UNARY_MATH_OPERATION = op
+
+    def __str__(self) -> str:
+        return f"PREFIX_STATEMENT(op: {self.op}, identifier: {self.identifier})"
 
 class CLOSE_C_STATEMENT(STATEMENT):
     def __init__(self, line_number: int) -> None:

@@ -10,6 +10,7 @@ A compiler for a minimal programming language that compiles to x86 assembly (NAS
 - `{ }` — scoped blocks with local variables
 - `print` — print Int64 to console
 - `exit` — exit with a return code
+- `++`, `--` — increment and decrement (prefix and postfix)
 - Arithmetic expressions: `+`, `-`, `*`, `//`, `%`
 - `if/else` — conditional branching
 - `while` — loops
@@ -60,7 +61,7 @@ print x;
 int64 i = 0;
 while (i != 5) {
   print i;
-  i = i + 1;
+  i++;
 }
 
 exit 0;

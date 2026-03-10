@@ -1,7 +1,7 @@
-from parser.expressions import BINARY_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION
+from parser.expressions import BINARY_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION
 from parser.program import PROGRAM
-from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT, STATEMENT, VARIABLE_TYPE, WHILE_STATEMENT
-from tokenizer.keywords import EQUALS_KEYWORD, GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INT_DIVISION_KEYWORD, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, PLUS_KEYWORD
+from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT, VARIABLE_TYPE, WHILE_STATEMENT
+from tokenizer.keywords import DECREMENT_KEYWORD, EQUALS_KEYWORD, GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INCREMENT_KEYWORD, INT_DIVISION_KEYWORD, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, PLUS_KEYWORD, UNARY_MATH_OPERATION
 
 
 class Scope:
@@ -71,6 +71,18 @@ class Compiler:
     def _has_var_or_const(self, name: str) -> bool:
         for scope in self._scopes:
             if scope.has(name):
+                return True
+        return False
+
+    def _has_var(self, name: str) -> bool:
+        for scope in self._scopes:
+            if scope.has_var(name):
+                return True
+        return False
+
+    def _has_const(self, name: str) -> bool:
+        for scope in self._scopes:
+            if scope.has_const(name):
                 return True
         return False
 
@@ -167,6 +179,12 @@ class Compiler:
     def _setne(self, var: str) -> None:
         self._text_s.append(f"    setne {var}")
 
+    def _inc(self, var: str) -> None:
+        self._text_s.append(f"    inc {var}")
+
+    def _dec(self, var: str) -> None:
+        self._text_s.append(f"    dec {var}")
+
     def _movzx(self, lval: str, rval: str) -> None:
         self._text_s.append(f"    movzx {lval}, {rval}")
 
@@ -236,6 +254,42 @@ class Compiler:
                 stack_offset = self._get_stack_offset(expr.name)
                 self._mov("rax", f"qword [rbp - {stack_offset}]")
                 self._push("rax")
+
+            case POSTFIX_EXPRESSION():
+                for scope in reversed(self._scopes):
+                    if scope.has_const(expr.identifier.name):
+                        raise ValueError(f"cant change constant '{expr.identifier.name}' in line {expr.identifier.line_number}")
+
+                    if scope.has_var(expr.identifier.name):
+                        break
+                else:
+                    raise ValueError(f"unknown identifier '{expr.identifier.name}' in line {expr.identifier.line_number}")
+
+                stack_offset = self._get_stack_offset(expr.identifier.name)
+                self._push(f"qword [rbp - {stack_offset}]")
+                match expr.op:
+                    case INCREMENT_KEYWORD():
+                        self._inc(f"qword [rbp - {stack_offset}]")
+                    case DECREMENT_KEYWORD():
+                        self._dec(f"qword [rbp - {stack_offset}]")
+
+            case PREFIX_EXPRESSION():
+                for scope in reversed(self._scopes):
+                    if scope.has_const(expr.identifier.name):
+                        raise ValueError(f"cant change constant '{expr.identifier.name}' in line {expr.identifier.line_number}")
+
+                    if scope.has_var(expr.identifier.name):
+                        break
+                else:
+                    raise ValueError(f"unknown identifier '{expr.identifier.name}' in line {expr.identifier.line_number}")
+
+                stack_offset = self._get_stack_offset(expr.identifier.name)
+                match expr.op:
+                    case INCREMENT_KEYWORD():
+                        self._inc(f"qword [rbp - {stack_offset}]")
+                    case DECREMENT_KEYWORD():
+                        self._dec(f"qword [rbp - {stack_offset}]")
+                self._push(f"qword [rbp - {stack_offset}]")
 
             case _:
                 raise ValueError(f"unexpected expression '{expr}' in line {expr.line_number}")
@@ -353,8 +407,29 @@ class Compiler:
 
         self._label(end_label)
 
+    def _gen_unary_op(self, identifier: IDENTIFIER_EXPRESSION, op: UNARY_MATH_OPERATION) -> None:
+        for scope in reversed(self._scopes):
+            if scope.has_const(identifier.name):
+                raise ValueError(f"cant change constant '{identifier.name}' in line {identifier.line_number}")
+
+            if scope.has_var(identifier.name):
+                break
+        else:
+            raise ValueError(f"unknown identifier '{identifier.name}' in line {identifier.line_number}")
+
+        stack_offset = self._get_stack_offset(identifier.name)
+        match op:
+            case INCREMENT_KEYWORD():
+                self._inc(f"qword [rbp - {stack_offset}]")
+            case DECREMENT_KEYWORD():
+                self._dec(f"qword [rbp - {stack_offset}]")
+            case _:
+                raise ValueError(f"unknown unary math operation '{op}' in line {op.line_number}")
+
     def _compile_statement(self, statement) -> None:
         match statement:
+            case POSTFIX_STATEMENT() | PREFIX_STATEMENT():
+                self._gen_unary_op(statement.identifier, statement.op)
             case WHILE_STATEMENT():
                 self._gen_while(statement.expr, statement.body)
             case IF_STATEMENT():

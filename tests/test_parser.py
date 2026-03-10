@@ -1,9 +1,9 @@
 import pytest
 from parser.parser import Parser
 from parser.program import PROGRAM
-from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT, WHILE_STATEMENT
-from parser.expressions import BINARY_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, STR_EXPRESSION
-from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, ELSE_KEYWORD, EQUALS_KEYWORD, EXIT_KEYWORD, IF_KEYWORD, INT64_KEYWORD, LESS_KEYWORD, MINUS_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON, WHILE_KEYWORD
+from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, WHILE_STATEMENT
+from parser.expressions import BINARY_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION, STR_EXPRESSION
+from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, DECREMENT_KEYWORD, ELSE_KEYWORD, EQUALS_KEYWORD, EXIT_KEYWORD, IF_KEYWORD, INCREMENT_KEYWORD, INT64_KEYWORD, LESS_KEYWORD, MINUS_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON, WHILE_KEYWORD
 from tokenizer.literals import INT_LITERAL, STR_LITERAL
 from tokenizer.tokens import IDENTIFIER
 
@@ -1251,3 +1251,148 @@ class TestParserWhileIntegration:
         assert isinstance(outer, WHILE_STATEMENT)
         if_stmts = [s for s in outer.body if isinstance(s, IF_STATEMENT)]
         assert len(if_stmts) == 1
+
+
+class TestParserPostfixStatement:
+    def test_postfix_increment_statement(self):
+        tokens = [IDENTIFIER(1, "i"), INCREMENT_KEYWORD(1), SEMICOLON(1)]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, POSTFIX_STATEMENT)
+        assert stmt.identifier.name == "i"
+        assert isinstance(stmt.op, INCREMENT_KEYWORD)
+
+    def test_postfix_decrement_statement(self):
+        tokens = [IDENTIFIER(1, "i"), DECREMENT_KEYWORD(1), SEMICOLON(1)]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, POSTFIX_STATEMENT)
+        assert stmt.identifier.name == "i"
+        assert isinstance(stmt.op, DECREMENT_KEYWORD)
+
+    def test_postfix_str(self):
+        tokens = [IDENTIFIER(1, "x"), INCREMENT_KEYWORD(1), SEMICOLON(1)]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert "x" in str(stmt)
+        assert "++" in str(stmt)
+
+
+class TestParserPrefixStatement:
+    def test_prefix_increment_statement(self):
+        tokens = [INCREMENT_KEYWORD(1), IDENTIFIER(1, "i"), SEMICOLON(1)]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, PREFIX_STATEMENT)
+        assert stmt.identifier.name == "i"
+        assert isinstance(stmt.op, INCREMENT_KEYWORD)
+
+    def test_prefix_decrement_statement(self):
+        tokens = [DECREMENT_KEYWORD(1), IDENTIFIER(1, "i"), SEMICOLON(1)]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, PREFIX_STATEMENT)
+        assert stmt.identifier.name == "i"
+        assert isinstance(stmt.op, DECREMENT_KEYWORD)
+
+    def test_prefix_str(self):
+        tokens = [INCREMENT_KEYWORD(1), IDENTIFIER(1, "x"), SEMICOLON(1)]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert "++" in str(stmt)
+        assert "x" in str(stmt)
+
+
+class TestParserPostfixExpression:
+    def test_postfix_increment_in_int64(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("int64 a = b++;").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, INT64_STATEMENT)
+        assert isinstance(stmt.expr, POSTFIX_EXPRESSION)
+        assert stmt.expr.identifier.name == "b"
+        assert isinstance(stmt.expr.op, INCREMENT_KEYWORD)
+
+    def test_postfix_decrement_in_int64(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("int64 a = b--;").tokenize()
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt.expr, POSTFIX_EXPRESSION)
+        assert isinstance(stmt.expr.op, DECREMENT_KEYWORD)
+
+    def test_postfix_in_exit(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("exit x++;").tokenize()
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, EXIT_STATEMENT)
+        assert isinstance(stmt.return_code, POSTFIX_EXPRESSION)
+
+    def test_postfix_in_arithmetic(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("exit x++ + 1;").tokenize()
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt.return_code, BINARY_EXPRESSION)
+        assert isinstance(stmt.return_code.lval, POSTFIX_EXPRESSION)
+
+    def test_postfix_str(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("int64 a = b++;").tokenize()
+        program = Parser(tokens).parse()
+        expr = program.statements[0].expr
+        assert "b" in str(expr)
+        assert "++" in str(expr)
+
+
+class TestParserPrefixExpression:
+    def test_prefix_increment_in_int64(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("int64 a = ++b;").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, INT64_STATEMENT)
+        assert isinstance(stmt.expr, PREFIX_EXPRESSION)
+        assert stmt.expr.identifier.name == "b"
+        assert isinstance(stmt.expr.op, INCREMENT_KEYWORD)
+
+    def test_prefix_decrement_in_int64(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("int64 a = --b;").tokenize()
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt.expr, PREFIX_EXPRESSION)
+        assert isinstance(stmt.expr.op, DECREMENT_KEYWORD)
+
+    def test_prefix_in_exit(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("exit ++x;").tokenize()
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, EXIT_STATEMENT)
+        assert isinstance(stmt.return_code, PREFIX_EXPRESSION)
+
+    def test_prefix_in_arithmetic(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("exit ++x + 1;").tokenize()
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt.return_code, BINARY_EXPRESSION)
+        assert isinstance(stmt.return_code.lval, PREFIX_EXPRESSION)
+
+    def test_prefix_in_while_condition(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("while (++i < 5) { print i; }").tokenize()
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, WHILE_STATEMENT)
+        assert isinstance(stmt.expr, BINARY_EXPRESSION)
+        assert isinstance(stmt.expr.lval, PREFIX_EXPRESSION)

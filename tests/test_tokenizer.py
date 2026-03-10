@@ -854,3 +854,77 @@ class TestTokenizerStopChars:
         assert isinstance(tokens[1], INT_DIVISION_KEYWORD)
         assert isinstance(tokens[2], INT_LITERAL)
         assert tokens[2].val == 3
+
+
+class TestTokenizerIncrementDecrement:
+    def test_increment(self):
+        from tokenizer.keywords import INCREMENT_KEYWORD
+        tokens = Tokenizer("++").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], INCREMENT_KEYWORD)
+
+    def test_decrement(self):
+        from tokenizer.keywords import DECREMENT_KEYWORD
+        tokens = Tokenizer("--").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], DECREMENT_KEYWORD)
+
+    def test_increment_repr(self):
+        tokens = Tokenizer("++").tokenize()
+        assert repr(tokens[0]) == "++"
+
+    def test_decrement_repr(self):
+        tokens = Tokenizer("--").tokenize()
+        assert repr(tokens[0]) == "--"
+
+    def test_postfix_increment_tokens(self):
+        from tokenizer.keywords import INCREMENT_KEYWORD
+        tokens = Tokenizer("i++;").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert tokens[0].val == "i"
+        assert isinstance(tokens[1], INCREMENT_KEYWORD)
+        assert isinstance(tokens[2], SEMICOLON)
+
+    def test_postfix_decrement_tokens(self):
+        from tokenizer.keywords import DECREMENT_KEYWORD
+        tokens = Tokenizer("i--;").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert tokens[0].val == "i"
+        assert isinstance(tokens[1], DECREMENT_KEYWORD)
+        assert isinstance(tokens[2], SEMICOLON)
+
+    def test_prefix_increment_tokens(self):
+        from tokenizer.keywords import INCREMENT_KEYWORD
+        tokens = Tokenizer("++i;").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], INCREMENT_KEYWORD)
+        assert isinstance(tokens[1], IDENTIFIER)
+        assert tokens[1].val == "i"
+        assert isinstance(tokens[2], SEMICOLON)
+
+    def test_prefix_decrement_tokens(self):
+        from tokenizer.keywords import DECREMENT_KEYWORD
+        tokens = Tokenizer("--i;").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], DECREMENT_KEYWORD)
+        assert isinstance(tokens[1], IDENTIFIER)
+        assert tokens[1].val == "i"
+        assert isinstance(tokens[2], SEMICOLON)
+
+    def test_increment_no_spaces(self):
+        from tokenizer.keywords import INCREMENT_KEYWORD
+        tokens = Tokenizer("x++").tokenize()
+        assert len(tokens) == 2
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert isinstance(tokens[1], INCREMENT_KEYWORD)
+
+    def test_plus_vs_increment(self):
+        from tokenizer.keywords import PLUS_KEYWORD, INCREMENT_KEYWORD
+        tokens = Tokenizer("a + ++b").tokenize()
+        assert len(tokens) == 4
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert isinstance(tokens[1], PLUS_KEYWORD)
+        assert isinstance(tokens[2], INCREMENT_KEYWORD)
+        assert isinstance(tokens[3], IDENTIFIER)

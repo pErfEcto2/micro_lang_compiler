@@ -151,6 +151,26 @@ class INT_DIVISION_KEYWORD(MATH_OPERATION):
     def __str__(self) -> str:
         return "//"
 
+class UNARY_MATH_OPERATION(MATH_OPERATION):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+
+class INCREMENT_KEYWORD(UNARY_MATH_OPERATION):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+        self.bpower: int = 5
+
+    def __str__(self) -> str:
+        return "++"
+
+class DECREMENT_KEYWORD(UNARY_MATH_OPERATION):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+        self.bpower: int = 5
+
+    def __str__(self) -> str:
+        return "--"
+
 class MODULO_KEYWORD(MATH_OPERATION):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)

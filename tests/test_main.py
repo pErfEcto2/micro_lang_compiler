@@ -589,3 +589,147 @@ class TestRuntimeWhileScope:
         src = "int64 x = 0;\nwhile (x < 2000000) {\n  int64 y = x;\n  x = x + 1;\n}\nexit 42;"
         result = run_executable(src)
         assert result.returncode == 42
+
+
+class TestMainPostfixStatement:
+    def test_postfix_increment_creates_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("int64 x = 0;\nx++;\nexit x;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "inc qword [rbp - 8]" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_postfix_decrement_creates_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("int64 x = 5;\nx--;\nexit x;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "dec qword [rbp - 8]" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_const_postfix_fails(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("const int64 x = 5;\nx++;")
+            src_path = f.name
+
+        try:
+            result = run_compiler("-n", src_path)
+            assert result.returncode != 0
+        finally:
+            os.unlink(src_path)
+
+
+class TestMainPrefixStatement:
+    def test_prefix_increment_creates_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("int64 x = 0;\n++x;\nexit x;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "inc qword [rbp - 8]" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_prefix_decrement_creates_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("int64 x = 5;\n--x;\nexit x;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "dec qword [rbp - 8]" in content
+        finally:
+            os.unlink(src_path)
+
+
+class TestRuntimePostfixIncrement:
+    def test_postfix_increment(self):
+        result = run_executable("int64 x = 0;\nx++;\nexit x;")
+        assert result.returncode == 1
+
+    def test_postfix_decrement(self):
+        result = run_executable("int64 x = 5;\nx--;\nexit x;")
+        assert result.returncode == 4
+
+    def test_postfix_in_while_loop(self):
+        src = "int64 i = 0;\nwhile (i < 10) {\n  i++;\n}\nexit i % 256;"
+        result = run_executable(src)
+        assert result.returncode == 10
+
+    def test_postfix_decrement_in_while_loop(self):
+        src = "int64 i = 5;\nwhile (i > 0) {\n  i--;\n}\nexit i;"
+        result = run_executable(src)
+        assert result.returncode == 0
+
+    def test_postfix_expr_returns_old_value(self):
+        src = "int64 x = 5;\nint64 a = x++;\nexit a;"
+        result = run_executable(src)
+        assert result.returncode == 5
+
+    def test_postfix_expr_mutates_variable(self):
+        src = "int64 x = 5;\nint64 a = x++;\nexit x;"
+        result = run_executable(src)
+        assert result.returncode == 6
+
+    def test_postfix_decrement_expr_returns_old_value(self):
+        src = "int64 x = 5;\nint64 a = x--;\nexit a;"
+        result = run_executable(src)
+        assert result.returncode == 5
+
+    def test_postfix_decrement_expr_mutates_variable(self):
+        src = "int64 x = 5;\nint64 a = x--;\nexit x;"
+        result = run_executable(src)
+        assert result.returncode == 4
+
+
+class TestRuntimePrefixIncrement:
+    def test_prefix_increment(self):
+        result = run_executable("int64 x = 0;\n++x;\nexit x;")
+        assert result.returncode == 1
+
+    def test_prefix_decrement(self):
+        result = run_executable("int64 x = 5;\n--x;\nexit x;")
+        assert result.returncode == 4
+
+    def test_prefix_expr_returns_new_value(self):
+        src = "int64 x = 5;\nint64 a = ++x;\nexit a;"
+        result = run_executable(src)
+        assert result.returncode == 6
+
+    def test_prefix_decrement_expr_returns_new_value(self):
+        src = "int64 x = 5;\nint64 a = --x;\nexit a;"
+        result = run_executable(src)
+        assert result.returncode == 4
+
+    def test_prefix_in_while_condition(self):
+        src = "int64 i = 0;\nwhile (++i < 5) {\n  print i;\n}\nexit i;"
+        result = run_executable(src)
+        assert result.returncode == 5

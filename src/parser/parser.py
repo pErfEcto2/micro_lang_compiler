@@ -1,7 +1,7 @@
-from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, PRINT_STATEMENT, STATEMENT, WHILE_STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT, WHILE_STATEMENT
 from parser.program import PROGRAM
-from parser.expressions import BINARY_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION
-from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, ELSE_KEYWORD, EXIT_KEYWORD, IF_KEYWORD, INT64_KEYWORD, MATH_OPERATION, OPEN_BRACKET, OPEN_C_BRACKET, PRINT_KEYWORD, SEMICOLON, WHILE_KEYWORD
+from parser.expressions import BINARY_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION
+from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, DECREMENT_KEYWORD, ELSE_KEYWORD, EXIT_KEYWORD, IF_KEYWORD, INCREMENT_KEYWORD, INT64_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MULTIPLY_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PRINT_KEYWORD, SEMICOLON, UNARY_MATH_OPERATION, WHILE_KEYWORD
 from tokenizer.literals import INT_LITERAL
 from tokenizer.tokens import IDENTIFIER, Token
 
@@ -49,12 +49,29 @@ class Parser:
     def _parse_expr(self, token, min_bp: int = 0) -> EXPRESSION:
         ln = token.line_number
         match token:
+            case MINUS_KEYWORD():
+                return BINARY_EXPRESSION(ln, INT_EXPRESSION(ln, -1), MULTIPLY_KEYWORD(ln), self._parse_expr(self._consume()))
+            case OPEN_BRACKET():
+                expr = self._parse_expr(self._consume())
+                self._assert_current_token_type(CLOSE_BRACKET)
+                self._consume()
+                return self._get_expr(expr, min_bp, ln)
+
             case INT_LITERAL():
                 left = INT_EXPRESSION(ln, token.val)
                 return self._get_expr(left, min_bp, ln)
 
+            case UNARY_MATH_OPERATION():
+                self._assert_current_token_type(IDENTIFIER)
+                identifier = IDENTIFIER_EXPRESSION(ln, self._consume().val)
+                left = PREFIX_EXPRESSION(ln, token, identifier)
+                return self._get_expr(left, min_bp, ln)
+
             case IDENTIFIER():
                 left = IDENTIFIER_EXPRESSION(ln, token.val)
+                if isinstance(self._peek(), UNARY_MATH_OPERATION):
+                    op = self._consume()
+                    left = POSTFIX_EXPRESSION(ln, left, op)
                 return self._get_expr(left, min_bp, ln)
                 
             case _:
@@ -123,8 +140,27 @@ class Parser:
 
         return WHILE_STATEMENT(ln, expr, body)
 
+    def _parse_postfix_statement(self, ln: int, identifier_name: str) -> POSTFIX_STATEMENT:
+        op = self._consume()
+        identifier = IDENTIFIER_EXPRESSION(ln, identifier_name)
+        self._assert_current_token_type(SEMICOLON)
+        self._consume()
+        return POSTFIX_STATEMENT(ln, identifier, op)
+
+    def _parse_prefix_statement(self, ln: int, op: UNARY_MATH_OPERATION) -> PREFIX_STATEMENT:
+        self._assert_current_token_type(IDENTIFIER)
+        name = self._consume().val
+        identifier = IDENTIFIER_EXPRESSION(ln, name)
+
+        self._assert_current_token_type(SEMICOLON)
+        self._consume()
+
+        return PREFIX_STATEMENT(ln, op, identifier)
+
     def _create_statement(self, token) -> STATEMENT | None:
         match token:
+            case UNARY_MATH_OPERATION():
+                return self._parse_prefix_statement(token.line_number, token)
             case WHILE_KEYWORD():
                 return self._parse_while_statement(token.line_number)
             case IF_KEYWORD():
@@ -136,7 +172,10 @@ class Parser:
             case CONST_KEYWORD():
                 return self._parse_const_statement(token.line_number)
             case IDENTIFIER():
-                return self._parse_assign_statement(token.line_number, token.val)
+                if self._peek() is not None and isinstance(self._peek(), UNARY_MATH_OPERATION):
+                    return self._parse_postfix_statement(token.line_number, token.val)
+                else:
+                    return self._parse_assign_statement(token.line_number, token.val)
             case EXIT_KEYWORD():
                 return self._parse_exit_statement()
             case INT64_KEYWORD():

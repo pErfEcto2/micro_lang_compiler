@@ -1,4 +1,4 @@
-from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, EQUALS_KEYWORD, GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INT_DIVISION_KEYWORD, KEYWORDS, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, SEMICOLON
+from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, DECREMENT_KEYWORD, EQUALS_KEYWORD, GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INCREMENT_KEYWORD, INT64_KEYWORD, INT_DIVISION_KEYWORD, KEYWORDS, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, SEMICOLON
 from tokenizer.literals import INT_LITERAL
 from tokenizer.tokens import Token, IDENTIFIER
 
@@ -19,6 +19,18 @@ class Tokenizer:
         self._idx += 1
         return self._src[self._idx - 1]
 
+    def _assemble_int(self, first_char: str) -> int:
+        number = first_char
+        while self._peek() and self._peek() not in self._stop_chars:
+            if self._peek().isalpha():
+                raise ValueError(f"invalid syntax in line {self._line_num}")
+            number_char = self._consume()
+            if not number_char.isdigit():
+                self._idx -= 1
+                break
+            number += number_char
+        return int(number)
+
     def tokenize(self) -> list[Token]:
         tokens: list[Token] = []
 
@@ -36,17 +48,8 @@ class Tokenizer:
                     tokens.append(IDENTIFIER(self._line_num, word))
 
             elif char.isdigit():
-                number = char
-                while self._peek() and self._peek() not in self._stop_chars:
-                    if self._peek().isalpha():
-                        raise ValueError(f"invalid syntax in line {self._line_num}")
-                    number_char = self._consume()
-                    if not number_char.isdigit():
-                        self._idx -= 1
-                        break
-                    number += number_char
-                tokens.append(INT_LITERAL(self._line_num, int(number)))
- 
+                tokens.append(INT_LITERAL(self._line_num, self._assemble_int(char)))
+
             elif char in [" ", "\t"]:
                 pass
 
@@ -116,10 +119,23 @@ class Tokenizer:
                         tokens.append(ASSIGN_KEYWORD(self._line_num))
             
             elif char == "+":
-                tokens.append(PLUS_KEYWORD(self._line_num))
+                if self._peek() is not None and self._peek() == "+":
+                    self._consume()
+                    tokens.append(INCREMENT_KEYWORD(self._line_num))
+                else:
+                    tokens.append(PLUS_KEYWORD(self._line_num))
             
             elif char == "-":
-                tokens.append(MINUS_KEYWORD(self._line_num))
+                if self._peek() is not None and self._peek() == "-":
+                    self._consume()
+                    tokens.append(DECREMENT_KEYWORD(self._line_num))
+                    continue
+
+                next_char = self._peek()
+                if next_char is not None and next_char.isdigit():
+                    tokens.append(INT_LITERAL(self._line_num, -1 * self._assemble_int(self._consume())))
+                else:
+                    tokens.append(MINUS_KEYWORD(self._line_num))
 
             elif char == "*":
                 tokens.append(MULTIPLY_KEYWORD(self._line_num))

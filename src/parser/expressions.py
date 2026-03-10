@@ -1,5 +1,5 @@
 from parser.ast_node import ASTNode
-from tokenizer.keywords import MATH_OPERATION
+from tokenizer.keywords import MATH_OPERATION, UNARY_MATH_OPERATION
 
 
 class EXPRESSION(ASTNode):
@@ -43,4 +43,24 @@ class IDENTIFIER_EXPRESSION(EXPRESSION):
 
     def __str__(self) -> str:
         return f"{self.name}"
+
+class UNARY_EXPRESSION(EXPRESSION):
+    def __init__(self, line_number: int, op: UNARY_MATH_OPERATION, identifier: IDENTIFIER_EXPRESSION) -> None:
+        super().__init__(line_number)
+        self.op: UNARY_MATH_OPERATION = op
+        self.identifier: IDENTIFIER_EXPRESSION = identifier
+
+class PREFIX_EXPRESSION(UNARY_EXPRESSION):
+    def __init__(self, line_number: int, op: UNARY_MATH_OPERATION, identifier: IDENTIFIER_EXPRESSION) -> None:
+        super().__init__(line_number, op, identifier)
+
+    def __str__(self) -> str:
+        return f"{self.op} {self.identifier}"
+
+class POSTFIX_EXPRESSION(UNARY_EXPRESSION):
+    def __init__(self, line_number: int, identifier: IDENTIFIER_EXPRESSION, op: UNARY_MATH_OPERATION) -> None:
+        super().__init__(line_number, op, identifier)
+
+    def __str__(self) -> str:
+        return f"{self.identifier} {self.op}"
 
