@@ -14,6 +14,7 @@ A compiler for a minimal programming language that compiles to x86 assembly (NAS
 - Arithmetic expressions: `+`, `-`, `*`, `//`, `%`
 - `if/else` — conditional branching
 - `while` — loops
+- `for` — loops with init/condition/increment
 - Comparison: `>`, `<`, `>=`, `<=`, `==`, `!=`
 - Comments: `# single-line`, `/* multi-line */`
 
@@ -64,6 +65,11 @@ while (i != 5) {
   i++;
 }
 
+# for loop
+for (int64 j = 0; j < 3; j++) {
+  print j;
+}
+
 exit 0;
 ```
 
@@ -75,3 +81,7 @@ Requires Python >= 3.12. Uses [uv](https://github.com/astral-sh/uv) for dependen
 uv sync
 uv run pytest
 ```
+
+## Note
+
+All compiler code is written entirely by hand — no AI tools were used to generate any part of the compiler. Tests and docs are generated using [Claude Code](https://claude.com/claude-code).

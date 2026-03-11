@@ -856,6 +856,60 @@ class TestTokenizerStopChars:
         assert tokens[2].val == 3
 
 
+class TestTokenizerForKeyword:
+    def test_for_keyword(self):
+        from tokenizer.keywords import FOR_KEYWORD
+        tokens = Tokenizer("for").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], FOR_KEYWORD)
+
+    def test_for_keyword_repr(self):
+        tokens = Tokenizer("for").tokenize()
+        assert repr(tokens[0]) == "for"
+
+    def test_for_not_identifier(self):
+        from tokenizer.keywords import FOR_KEYWORD
+        tokens = Tokenizer("for").tokenize()
+        assert not isinstance(tokens[0], IDENTIFIER)
+        assert isinstance(tokens[0], FOR_KEYWORD)
+
+    def test_forvar_is_identifier(self):
+        tokens = Tokenizer("forvar").tokenize()
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert tokens[0].val == "forvar"
+
+    def test_for_with_no_space_before_paren(self):
+        from tokenizer.keywords import FOR_KEYWORD, OPEN_BRACKET
+        tokens = Tokenizer("for(").tokenize()
+        assert isinstance(tokens[0], FOR_KEYWORD)
+        assert isinstance(tokens[1], OPEN_BRACKET)
+
+    def test_for_statement_tokens(self):
+        from tokenizer.keywords import FOR_KEYWORD, OPEN_BRACKET, CLOSE_BRACKET, LESS_KEYWORD, OPEN_C_BRACKET, CLOSE_C_BRACKET, INT64_KEYWORD, ASSIGN_KEYWORD, INCREMENT_KEYWORD
+        tokens = Tokenizer("for (int64 i = 0; i < 10; i++) {}").tokenize()
+        assert isinstance(tokens[0], FOR_KEYWORD)
+        assert isinstance(tokens[1], OPEN_BRACKET)
+        assert isinstance(tokens[2], INT64_KEYWORD)
+        assert isinstance(tokens[3], IDENTIFIER)
+        assert tokens[3].val == "i"
+        assert isinstance(tokens[4], ASSIGN_KEYWORD)
+        assert isinstance(tokens[5], INT_LITERAL)
+        assert tokens[5].val == 0
+        assert isinstance(tokens[6], SEMICOLON)
+        assert isinstance(tokens[7], IDENTIFIER)
+        assert tokens[7].val == "i"
+        assert isinstance(tokens[8], LESS_KEYWORD)
+        assert isinstance(tokens[9], INT_LITERAL)
+        assert tokens[9].val == 10
+        assert isinstance(tokens[10], SEMICOLON)
+        assert isinstance(tokens[11], IDENTIFIER)
+        assert tokens[11].val == "i"
+        assert isinstance(tokens[12], INCREMENT_KEYWORD)
+        assert isinstance(tokens[13], CLOSE_BRACKET)
+        assert isinstance(tokens[14], OPEN_C_BRACKET)
+        assert isinstance(tokens[15], CLOSE_C_BRACKET)
+
+
 class TestTokenizerIncrementDecrement:
     def test_increment(self):
         from tokenizer.keywords import INCREMENT_KEYWORD

@@ -230,6 +230,68 @@ while (i < 3) {
 
 Output: `0`, `10`, `20`.
 
+### For
+
+Use `for` for loops with an initialization, condition, and increment clause. All three clauses are optional:
+
+```
+for (int64 i = 0; i < 5; i++) {
+  print i;
+}
+```
+
+Output: `0`, `1`, `2`, `3`, `4`.
+
+The initialization can be a variable declaration or assignment:
+
+```
+int64 i = 0;
+for (i = 0; i < 3; i++) {
+  print i;
+}
+```
+
+Output: `0`, `1`, `2`.
+
+The increment can use any statement — postfix, prefix, or assignment:
+
+```
+for (int64 i = 0; i < 10; i = i + 2) {
+  print i;
+}
+```
+
+Output: `0`, `2`, `4`, `6`, `8`.
+
+All clauses can be omitted for an infinite loop:
+
+```
+for (;;) {
+  print 1;
+}
+```
+
+Variables declared in the initialization are scoped to the for loop:
+
+```
+for (int64 i = 0; i < 3; i++) {
+  int64 x = i * 10;
+  print x;
+}
+```
+
+Output: `0`, `10`, `20`.
+
+For loops can be nested:
+
+```
+for (int64 i = 0; i < 3; i++) {
+  for (int64 j = 0; j < 3; j++) {
+    print i + j;
+  }
+}
+```
+
 ### Exit
 
 Exit the program with a return code using `exit`:

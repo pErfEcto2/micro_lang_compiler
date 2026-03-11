@@ -1,7 +1,7 @@
-from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT, WHILE_STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, FOR_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT, WHILE_STATEMENT
 from parser.program import PROGRAM
 from parser.expressions import BINARY_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION
-from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, DECREMENT_KEYWORD, ELSE_KEYWORD, EXIT_KEYWORD, IF_KEYWORD, INCREMENT_KEYWORD, INT64_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MULTIPLY_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PRINT_KEYWORD, SEMICOLON, UNARY_MATH_OPERATION, WHILE_KEYWORD
+from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, ELSE_KEYWORD, EXIT_KEYWORD, FOR_KEYWORD, IF_KEYWORD, INT64_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MULTIPLY_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PRINT_KEYWORD, SEMICOLON, UNARY_MATH_OPERATION, WHILE_KEYWORD
 from tokenizer.literals import INT_LITERAL
 from tokenizer.tokens import IDENTIFIER, Token
 
@@ -83,15 +83,17 @@ class Parser:
         self._consume()
         return EXIT_STATEMENT(expr.line_number, expr)
 
-    def _parse_int64_statement(self) -> INT64_STATEMENT:
+    def _parse_int64_statement(self, expect_semicolon: bool = True) -> INT64_STATEMENT:
         self._assert_current_token_type(IDENTIFIER)
         identifier = self._consume()
         identifier = IDENTIFIER_EXPRESSION(identifier.line_number, identifier.val)
         self._assert_current_token_type(ASSIGN_KEYWORD)
         self._consume()
         expr = self._parse_expr(self._consume())
-        self._assert_current_token_type(SEMICOLON)
-        self._consume()
+
+        if expect_semicolon:
+            self._assert_current_token_type(SEMICOLON)
+            self._consume()
         return INT64_STATEMENT(expr.line_number, identifier, expr)
 
     def _parse_print_statement(self) -> PRINT_STATEMENT:
@@ -100,13 +102,15 @@ class Parser:
         self._consume()
         return PRINT_STATEMENT(expr.line_number, expr)
 
-    def _parse_assign_statement(self, ln: int, name: str) -> ASSIGN_STATEMENT:
+    def _parse_assign_statement(self, ln: int, name: str, expect_semicolon: bool = True) -> ASSIGN_STATEMENT:
         self._assert_current_token_type(ASSIGN_KEYWORD)
         self._consume()
         identifier = IDENTIFIER_EXPRESSION(ln, name)
         expr = self._parse_expr(self._consume())
-        self._assert_current_token_type(SEMICOLON)
-        self._consume()
+
+        if expect_semicolon:
+            self._assert_current_token_type(SEMICOLON)
+            self._consume()
         return ASSIGN_STATEMENT(expr.line_number, identifier, expr)
 
     def _parse_const_statement(self, ln: int) -> CONST_STATEMENT:
@@ -128,39 +132,78 @@ class Parser:
         
         self._assert_current_token_type(OPEN_C_BRACKET)
 
-        body = [self._create_statement(self._consume())]
+        body = []
         while self._peek() is not None and type(self._peek()) != CLOSE_C_BRACKET:
             if (statement := self._create_statement(self._consume())) is not None:
                 body.append(statement)
 
-        body.append(CLOSE_C_STATEMENT(ln))
-
         self._assert_current_token_type(CLOSE_C_BRACKET)
-        self._consume()
+        body.append(self._create_statement(self._consume()))
 
         return WHILE_STATEMENT(ln, expr, body)
 
-    def _parse_postfix_statement(self, ln: int, identifier_name: str) -> POSTFIX_STATEMENT:
+    def _parse_postfix_statement(self, ln: int, identifier_name: str, expect_semicolon: bool = True) -> POSTFIX_STATEMENT:
         op = self._consume()
         identifier = IDENTIFIER_EXPRESSION(ln, identifier_name)
-        self._assert_current_token_type(SEMICOLON)
-        self._consume()
+
+        if expect_semicolon:
+            self._assert_current_token_type(SEMICOLON)
+            self._consume()
         return POSTFIX_STATEMENT(ln, identifier, op)
 
-    def _parse_prefix_statement(self, ln: int, op: UNARY_MATH_OPERATION) -> PREFIX_STATEMENT:
+    def _parse_prefix_statement(self, ln: int, op: UNARY_MATH_OPERATION, expect_semicolon: bool = True) -> PREFIX_STATEMENT:
         self._assert_current_token_type(IDENTIFIER)
         name = self._consume().val
         identifier = IDENTIFIER_EXPRESSION(ln, name)
+        
+        if expect_semicolon:
+            self._assert_current_token_type(SEMICOLON)
+            self._consume()
+
+        return PREFIX_STATEMENT(ln, op, identifier)
+
+    def _parse_for_statement(self, ln: int) -> FOR_STATEMENT:
+        self._assert_current_token_type(OPEN_BRACKET)
+        self._consume()
+
+        init = None
+        if not isinstance(self._peek(), SEMICOLON):
+            init = self._create_statement(self._consume())
+        else:
+            self._assert_current_token_type(SEMICOLON)
+            self._consume()
+
+        cond = None
+        if not isinstance(self._peek(), SEMICOLON):
+            cond = self._parse_expr(self._consume())
 
         self._assert_current_token_type(SEMICOLON)
         self._consume()
 
-        return PREFIX_STATEMENT(ln, op, identifier)
+        inc = None
+        if not isinstance(self._peek(), CLOSE_BRACKET):
+            inc = self._create_statement(self._consume(), expect_semicolon=False)
 
-    def _create_statement(self, token) -> STATEMENT | None:
+        self._assert_current_token_type(CLOSE_BRACKET)
+        self._consume()
+
+        self._assert_current_token_type(OPEN_C_BRACKET)
+        body = []
+        while self._peek() is not None and type(self._peek()) != CLOSE_C_BRACKET:
+            if (statement := self._create_statement(self._consume())) is not None:
+                body.append(statement)
+
+        self._assert_current_token_type(CLOSE_C_BRACKET)
+        body.append(self._create_statement(self._consume()))
+
+        return FOR_STATEMENT(ln, body, init, cond, inc)
+
+    def _create_statement(self, token, expect_semicolon: bool = True) -> STATEMENT | None:
         match token:
+            case FOR_KEYWORD():
+                return self._parse_for_statement(token.line_number)
             case UNARY_MATH_OPERATION():
-                return self._parse_prefix_statement(token.line_number, token)
+                return self._parse_prefix_statement(token.line_number, token, expect_semicolon=expect_semicolon)
             case WHILE_KEYWORD():
                 return self._parse_while_statement(token.line_number)
             case IF_KEYWORD():
@@ -173,13 +216,13 @@ class Parser:
                 return self._parse_const_statement(token.line_number)
             case IDENTIFIER():
                 if self._peek() is not None and isinstance(self._peek(), UNARY_MATH_OPERATION):
-                    return self._parse_postfix_statement(token.line_number, token.val)
+                    return self._parse_postfix_statement(token.line_number, token.val, expect_semicolon=expect_semicolon)
                 else:
-                    return self._parse_assign_statement(token.line_number, token.val)
+                    return self._parse_assign_statement(token.line_number, token.val, expect_semicolon=expect_semicolon)
             case EXIT_KEYWORD():
                 return self._parse_exit_statement()
             case INT64_KEYWORD():
-                return self._parse_int64_statement()
+                return self._parse_int64_statement(expect_semicolon=expect_semicolon)
             case PRINT_KEYWORD():
                 return self._parse_print_statement()
             case SEMICOLON():
@@ -210,7 +253,7 @@ class Parser:
         if type(self._peek()) == ELSE_KEYWORD:
             self._consume()
             self._assert_current_token_type(OPEN_C_BRACKET)
-            false_body = [self._create_statement(self._consume())]
+            false_body = []
             while self._peek() is not None and type(self._peek()) != CLOSE_C_BRACKET:
                 if (statement := self._create_statement(self._consume())) is not None:
                     false_body.append(statement)

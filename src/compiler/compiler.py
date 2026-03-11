@@ -1,6 +1,6 @@
 from parser.expressions import BINARY_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION
 from parser.program import PROGRAM
-from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT, VARIABLE_TYPE, WHILE_STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, FOR_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT, VARIABLE_TYPE, WHILE_STATEMENT
 from tokenizer.keywords import DECREMENT_KEYWORD, EQUALS_KEYWORD, GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INCREMENT_KEYWORD, INT_DIVISION_KEYWORD, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, PLUS_KEYWORD, UNARY_MATH_OPERATION
 
 
@@ -426,8 +426,40 @@ class Compiler:
             case _:
                 raise ValueError(f"unknown unary math operation '{op}' in line {op.line_number}")
 
+    def _gen_for(self, ln: int, body: list[STATEMENT], init: STATEMENT | None, cond: EXPRESSION | None, inc: STATEMENT | None) -> None:
+        label_id = self._gen_label()
+        for_start = f".for_start_{label_id}"
+        for_end = f".for_end_{label_id}"
+
+        self._add_scope(ln)
+
+        if init is not None:
+            self._compile_statement(init)
+        
+        self._label(for_start)
+
+        if cond is not None:
+            self._eval_expr(cond)
+            self._pop("rax")
+            self._cmp("rax", "0")
+            self._je(for_end)
+
+        for statement in body:
+            self._compile_statement(statement)
+
+        if inc is not None:
+            self._compile_statement(inc)
+
+        self._jmp(for_start)
+
+        self._label(for_end)
+
+        self._remove_scope()
+
     def _compile_statement(self, statement) -> None:
         match statement:
+            case FOR_STATEMENT():
+                self._gen_for(statement.line_number, statement.body, statement.initialization, statement.condition, statement.increment)
             case POSTFIX_STATEMENT() | PREFIX_STATEMENT():
                 self._gen_unary_op(statement.identifier, statement.op)
             case WHILE_STATEMENT():

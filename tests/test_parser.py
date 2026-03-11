@@ -1,9 +1,9 @@
 import pytest
 from parser.parser import Parser
 from parser.program import PROGRAM
-from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, WHILE_STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, FOR_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, WHILE_STATEMENT
 from parser.expressions import BINARY_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION, STR_EXPRESSION
-from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, DECREMENT_KEYWORD, ELSE_KEYWORD, EQUALS_KEYWORD, EXIT_KEYWORD, IF_KEYWORD, INCREMENT_KEYWORD, INT64_KEYWORD, LESS_KEYWORD, MINUS_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON, WHILE_KEYWORD
+from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, DECREMENT_KEYWORD, ELSE_KEYWORD, EQUALS_KEYWORD, EXIT_KEYWORD, FOR_KEYWORD, IF_KEYWORD, INCREMENT_KEYWORD, INT64_KEYWORD, LESS_KEYWORD, MINUS_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON, WHILE_KEYWORD
 from tokenizer.literals import INT_LITERAL, STR_LITERAL
 from tokenizer.tokens import IDENTIFIER
 
@@ -1396,3 +1396,259 @@ class TestParserPrefixExpression:
         assert isinstance(stmt, WHILE_STATEMENT)
         assert isinstance(stmt.expr, BINARY_EXPRESSION)
         assert isinstance(stmt.expr.lval, PREFIX_EXPRESSION)
+
+
+class TestParserForStatement:
+    def test_simple_for(self):
+        tokens = [
+            FOR_KEYWORD(1), OPEN_BRACKET(1),
+            INT64_KEYWORD(1), IDENTIFIER(1, "i"), ASSIGN_KEYWORD(1), INT_LITERAL(1, 0), SEMICOLON(1),
+            IDENTIFIER(1, "i"), LESS_KEYWORD(1), INT_LITERAL(1, 10), SEMICOLON(1),
+            IDENTIFIER(1, "i"), INCREMENT_KEYWORD(1),
+            CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), PRINT_KEYWORD(2), INT_LITERAL(2, 42), SEMICOLON(2),
+            CLOSE_C_BRACKET(3),
+        ]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, FOR_STATEMENT)
+
+    def test_for_initialization(self):
+        tokens = [
+            FOR_KEYWORD(1), OPEN_BRACKET(1),
+            INT64_KEYWORD(1), IDENTIFIER(1, "i"), ASSIGN_KEYWORD(1), INT_LITERAL(1, 0), SEMICOLON(1),
+            IDENTIFIER(1, "i"), LESS_KEYWORD(1), INT_LITERAL(1, 10), SEMICOLON(1),
+            IDENTIFIER(1, "i"), INCREMENT_KEYWORD(1),
+            CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt.initialization, INT64_STATEMENT)
+        assert stmt.initialization.identifier.name == "i"
+
+    def test_for_condition(self):
+        tokens = [
+            FOR_KEYWORD(1), OPEN_BRACKET(1),
+            INT64_KEYWORD(1), IDENTIFIER(1, "i"), ASSIGN_KEYWORD(1), INT_LITERAL(1, 0), SEMICOLON(1),
+            IDENTIFIER(1, "i"), LESS_KEYWORD(1), INT_LITERAL(1, 10), SEMICOLON(1),
+            IDENTIFIER(1, "i"), INCREMENT_KEYWORD(1),
+            CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt.condition, BINARY_EXPRESSION)
+
+    def test_for_increment(self):
+        tokens = [
+            FOR_KEYWORD(1), OPEN_BRACKET(1),
+            INT64_KEYWORD(1), IDENTIFIER(1, "i"), ASSIGN_KEYWORD(1), INT_LITERAL(1, 0), SEMICOLON(1),
+            IDENTIFIER(1, "i"), LESS_KEYWORD(1), INT_LITERAL(1, 10), SEMICOLON(1),
+            IDENTIFIER(1, "i"), INCREMENT_KEYWORD(1),
+            CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt.increment, POSTFIX_STATEMENT)
+        assert stmt.increment.identifier.name == "i"
+
+    def test_for_body_statements(self):
+        tokens = [
+            FOR_KEYWORD(1), OPEN_BRACKET(1),
+            INT64_KEYWORD(1), IDENTIFIER(1, "i"), ASSIGN_KEYWORD(1), INT_LITERAL(1, 0), SEMICOLON(1),
+            IDENTIFIER(1, "i"), LESS_KEYWORD(1), INT_LITERAL(1, 3), SEMICOLON(1),
+            IDENTIFIER(1, "i"), INCREMENT_KEYWORD(1),
+            CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1),
+            PRINT_KEYWORD(2), INT_LITERAL(2, 1), SEMICOLON(2),
+            PRINT_KEYWORD(3), INT_LITERAL(3, 2), SEMICOLON(3),
+            CLOSE_C_BRACKET(4),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        print_stmts = [s for s in stmt.body if isinstance(s, PRINT_STATEMENT)]
+        assert len(print_stmts) == 2
+
+    def test_for_empty_init(self):
+        tokens = [
+            FOR_KEYWORD(1), OPEN_BRACKET(1),
+            SEMICOLON(1),
+            IDENTIFIER(1, "i"), LESS_KEYWORD(1), INT_LITERAL(1, 10), SEMICOLON(1),
+            IDENTIFIER(1, "i"), INCREMENT_KEYWORD(1),
+            CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert stmt.initialization is None
+
+    def test_for_empty_condition(self):
+        tokens = [
+            FOR_KEYWORD(1), OPEN_BRACKET(1),
+            INT64_KEYWORD(1), IDENTIFIER(1, "i"), ASSIGN_KEYWORD(1), INT_LITERAL(1, 0), SEMICOLON(1),
+            SEMICOLON(1),
+            IDENTIFIER(1, "i"), INCREMENT_KEYWORD(1),
+            CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert stmt.condition is None
+
+    def test_for_empty_increment(self):
+        tokens = [
+            FOR_KEYWORD(1), OPEN_BRACKET(1),
+            INT64_KEYWORD(1), IDENTIFIER(1, "i"), ASSIGN_KEYWORD(1), INT_LITERAL(1, 0), SEMICOLON(1),
+            IDENTIFIER(1, "i"), LESS_KEYWORD(1), INT_LITERAL(1, 10), SEMICOLON(1),
+            CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert stmt.increment is None
+
+    def test_for_with_assignment_init(self):
+        tokens = [
+            FOR_KEYWORD(1), OPEN_BRACKET(1),
+            IDENTIFIER(1, "i"), ASSIGN_KEYWORD(1), INT_LITERAL(1, 0), SEMICOLON(1),
+            IDENTIFIER(1, "i"), LESS_KEYWORD(1), INT_LITERAL(1, 5), SEMICOLON(1),
+            IDENTIFIER(1, "i"), INCREMENT_KEYWORD(1),
+            CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt.initialization, ASSIGN_STATEMENT)
+
+    def test_for_with_prefix_increment(self):
+        tokens = [
+            FOR_KEYWORD(1), OPEN_BRACKET(1),
+            INT64_KEYWORD(1), IDENTIFIER(1, "i"), ASSIGN_KEYWORD(1), INT_LITERAL(1, 0), SEMICOLON(1),
+            IDENTIFIER(1, "i"), LESS_KEYWORD(1), INT_LITERAL(1, 10), SEMICOLON(1),
+            INCREMENT_KEYWORD(1), IDENTIFIER(1, "i"),
+            CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt.increment, PREFIX_STATEMENT)
+
+    def test_for_missing_open_paren(self):
+        tokens = [
+            FOR_KEYWORD(1), INT64_KEYWORD(1), IDENTIFIER(1, "i"), ASSIGN_KEYWORD(1), INT_LITERAL(1, 0), SEMICOLON(1),
+            SEMICOLON(1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+        ]
+        with pytest.raises(ValueError, match="expected"):
+            Parser(tokens).parse()
+
+    def test_for_repr(self):
+        stmt = FOR_STATEMENT(1, [], None, None, None)
+        assert "FOR_STATEMENT" in repr(stmt)
+
+    def test_for_followed_by_statements(self):
+        tokens = [
+            FOR_KEYWORD(1), OPEN_BRACKET(1),
+            SEMICOLON(1), SEMICOLON(1),
+            CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+            PRINT_KEYWORD(2), INT_LITERAL(2, 99), SEMICOLON(2),
+        ]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 2
+        assert isinstance(program.statements[0], FOR_STATEMENT)
+        assert isinstance(program.statements[1], PRINT_STATEMENT)
+
+
+class TestParserNestedFor:
+    def test_for_inside_if(self):
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1),
+            FOR_KEYWORD(2), OPEN_BRACKET(2), SEMICOLON(2), SEMICOLON(2), CLOSE_BRACKET(2),
+            OPEN_C_BRACKET(2), PRINT_KEYWORD(3), INT_LITERAL(3, 1), SEMICOLON(3),
+            CLOSE_C_BRACKET(4),
+            CLOSE_C_BRACKET(5),
+        ]
+        program = Parser(tokens).parse()
+        outer = program.statements[0]
+        assert isinstance(outer, IF_STATEMENT)
+        for_stmts = [s for s in outer.true_body if isinstance(s, FOR_STATEMENT)]
+        assert len(for_stmts) == 1
+
+    def test_for_inside_while(self):
+        tokens = [
+            WHILE_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1),
+            FOR_KEYWORD(2), OPEN_BRACKET(2), SEMICOLON(2), SEMICOLON(2), CLOSE_BRACKET(2),
+            OPEN_C_BRACKET(2), CLOSE_C_BRACKET(3),
+            CLOSE_C_BRACKET(4),
+        ]
+        program = Parser(tokens).parse()
+        outer = program.statements[0]
+        assert isinstance(outer, WHILE_STATEMENT)
+        for_stmts = [s for s in outer.body if isinstance(s, FOR_STATEMENT)]
+        assert len(for_stmts) == 1
+
+    def test_nested_for(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("for (int64 i = 0; i < 3; i++) { for (int64 j = 0; j < 3; j++) { print j; } }").tokenize()
+        program = Parser(tokens).parse()
+        outer = program.statements[0]
+        assert isinstance(outer, FOR_STATEMENT)
+        inner_fors = [s for s in outer.body if isinstance(s, FOR_STATEMENT)]
+        assert len(inner_fors) == 1
+
+
+class TestParserForIntegration:
+    def test_full_pipeline_simple_for(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("for (int64 i = 0; i < 10; i++) { print i; }").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        assert isinstance(program.statements[0], FOR_STATEMENT)
+
+    def test_full_pipeline_for_with_body(self):
+        from tokenizer.tokenizer import Tokenizer
+        src = "for (int64 i = 0; i < 5; i++) {\n  print i;\n}"
+        tokens = Tokenizer(src).tokenize()
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, FOR_STATEMENT)
+        assert isinstance(stmt.initialization, INT64_STATEMENT)
+        assert isinstance(stmt.condition, BINARY_EXPRESSION)
+        assert isinstance(stmt.increment, POSTFIX_STATEMENT)
+        print_stmts = [s for s in stmt.body if isinstance(s, PRINT_STATEMENT)]
+        assert len(print_stmts) == 1
+
+    def test_full_pipeline_for_followed_by_exit(self):
+        from tokenizer.tokenizer import Tokenizer
+        src = "for (int64 i = 0; i < 5; i++) { print i; }\nexit 0;"
+        tokens = Tokenizer(src).tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 2
+        assert isinstance(program.statements[0], FOR_STATEMENT)
+        assert isinstance(program.statements[1], EXIT_STATEMENT)
+
+    def test_full_pipeline_for_with_assign_increment(self):
+        from tokenizer.tokenizer import Tokenizer
+        src = "for (int64 i = 0; i < 10; i = i + 1) { print i; }"
+        tokens = Tokenizer(src).tokenize()
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, FOR_STATEMENT)
+        assert isinstance(stmt.increment, ASSIGN_STATEMENT)
+
+    def test_full_pipeline_for_empty_clauses(self):
+        from tokenizer.tokenizer import Tokenizer
+        src = "for (;;) { print 1; }"
+        tokens = Tokenizer(src).tokenize()
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, FOR_STATEMENT)
+        assert stmt.initialization is None
+        assert stmt.condition is None
+        assert stmt.increment is None

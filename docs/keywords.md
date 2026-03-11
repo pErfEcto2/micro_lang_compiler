@@ -12,7 +12,7 @@
 | `if/else` | Conditional branching |
 | `while` | Loop |
 | `do/while` | Loop *(not implemented)* |
-| `for` | Loop *(not implemented)* |
+| `for` | Loop |
 | `=` | Assign |
 | `const` | Make a variable constant |
 | `+=` | Assignment by sum *(not implemented)* |

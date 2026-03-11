@@ -61,6 +61,17 @@ class WHILE_STATEMENT(STATEMENT):
     def __str__(self) -> str:
         return f"WHILE_STATEMENT(expr: {self.expr}, body: {self.body})"
 
+class FOR_STATEMENT(STATEMENT):
+    def __init__(self, line_number: int, body: list[STATEMENT], initialization: STATEMENT | None = None, condition: EXPRESSION | None = None, increment: STATEMENT | None = None) -> None:
+        super().__init__(line_number)
+        self.body: list[STATEMENT] = body
+        self.initialization: STATEMENT | None = initialization
+        self.condition: EXPRESSION | None = condition
+        self.increment: STATEMENT | None = increment
+
+    def __str__(self) -> str:
+        return f"FOR_STATEMENT(body: {self.body}, init: {self.initialization}, condition: {self.condition}, increment: {self.increment})"
+
 class ASSIGN_STATEMENT(STATEMENT):
     def __init__(self, line_number: int, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION) -> None:
         super().__init__(line_number)

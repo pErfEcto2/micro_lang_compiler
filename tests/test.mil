@@ -1,4 +1,28 @@
-const int64 a = 0;
-int64 b = a++;
+# for loop: sum numbers 0 to 9
+int64 sum = 0;
+for (int64 i = 0; i < 10; i++) {
+  sum = sum + i;
+}
+print sum;
 
-print a;
+# nested for loop
+int64 total = 0;
+for (int64 i = 0; i < 3; i++) {
+  for (int64 j = 0; j < 4; j++) {
+    total = total + 1;
+  }
+}
+print total;
+
+# for with while inside
+int64 count = 0;
+for (int64 i = 0; i < 5; i++) {
+  int64 n = i;
+  while (n > 0) {
+    count++;
+    n--;
+  }
+}
+print count;
+
+exit 0;

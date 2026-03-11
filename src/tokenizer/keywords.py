@@ -68,6 +68,14 @@ class WHILE_KEYWORD(KEYWORD):
     def __str__(self) -> str:
         return "while"
 
+@register_keyword("for")
+class FOR_KEYWORD(KEYWORD):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+
+    def __str__(self) -> str:
+        return "for"
+
 @register_keyword("const")
 class CONST_KEYWORD(KEYWORD):
     def __init__(self, line_num: int) -> None:

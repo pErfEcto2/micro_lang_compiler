@@ -733,3 +733,94 @@ class TestRuntimePrefixIncrement:
         src = "int64 i = 0;\nwhile (++i < 5) {\n  print i;\n}\nexit i;"
         result = run_executable(src)
         assert result.returncode == 5
+
+
+class TestMainForStatement:
+    def test_simple_for_creates_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("for (int64 i = 0; i < 5; i++) { print i; }")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "cmp rax, 0" in content
+                assert "je .for_end_0" in content
+                assert "jmp .for_start_0" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_for_with_empty_body(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("for (int64 i = 0; i < 10; i++) {}")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+        finally:
+            os.unlink(src_path)
+
+    def test_verbose_for_shows_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("for (int64 i = 0; i < 5; i++) { print i; }")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-v", "-o", out_path, src_path)
+                assert ".for_start_0:" in result.stdout
+                assert ".for_end_0:" in result.stdout
+        finally:
+            os.unlink(src_path)
+
+
+class TestRuntimeForLoop:
+    def test_for_loop_basic(self):
+        src = "int64 sum = 0;\nfor (int64 i = 0; i < 5; i++) {\n  sum = sum + i;\n}\nexit sum;"
+        result = run_executable(src)
+        assert result.returncode == 10  # 0+1+2+3+4
+
+    def test_for_loop_count(self):
+        src = "int64 count = 0;\nfor (int64 i = 0; i < 3; i++) {\n  count = count + 1;\n}\nexit count;"
+        result = run_executable(src)
+        assert result.returncode == 3
+
+    def test_for_loop_countdown(self):
+        src = "int64 count = 0;\nfor (int64 i = 10; i > 0; i--) {\n  count = count + 1;\n}\nexit count;"
+        result = run_executable(src)
+        assert result.returncode == 10
+
+    def test_for_loop_nested(self):
+        src = "int64 sum = 0;\nfor (int64 i = 0; i < 3; i++) {\n  for (int64 j = 0; j < 3; j++) {\n    sum = sum + 1;\n  }\n}\nexit sum;"
+        result = run_executable(src)
+        assert result.returncode == 9  # 3*3
+
+    def test_for_loop_with_var_inside(self):
+        """For loop declaring a variable inside body should not segfault from stack leak"""
+        src = "for (int64 i = 0; i < 100; i++) {\n  int64 y = i;\n}\nexit 42;"
+        result = run_executable(src)
+        assert result.returncode == 42
+
+    def test_for_loop_large_does_not_segfault(self):
+        """A long-running for loop with var decl must not overflow the stack"""
+        src = "for (int64 i = 0; i < 2000000; i++) {\n  int64 y = i;\n}\nexit 42;"
+        result = run_executable(src)
+        assert result.returncode == 42
+
+    def test_for_loop_assign_increment(self):
+        src = "int64 sum = 0;\nfor (int64 i = 0; i < 5; i = i + 2) {\n  sum = sum + i;\n}\nexit sum;"
+        result = run_executable(src)
+        assert result.returncode == 6  # 0+2+4
+
+    def test_for_loop_prefix_increment(self):
+        src = "int64 sum = 0;\nfor (int64 i = 0; i < 5; ++i) {\n  sum = sum + i;\n}\nexit sum;"
+        result = run_executable(src)
+        assert result.returncode == 10  # 0+1+2+3+4

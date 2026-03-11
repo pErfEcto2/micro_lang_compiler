@@ -1,7 +1,7 @@
 import pytest
 from compiler.compiler import Compiler
 from parser.program import PROGRAM
-from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, FOR_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT
 from parser.expressions import BINARY_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION, STR_EXPRESSION
 from tokenizer.keywords import DECREMENT_KEYWORD, EQUALS_KEYWORD, GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INCREMENT_KEYWORD, INT_DIVISION_KEYWORD, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, PLUS_KEYWORD
 
@@ -1335,4 +1335,75 @@ class TestCompilerPrefixExpression:
         )
         with pytest.raises(ValueError, match="unknown identifier"):
             Compiler(prog).compile()
+
+
+class TestCompilerForStatement:
+    def test_for_emits_labels(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        src = "for (int64 i = 0; i < 5; i++) { print i; }"
+        tokens = Tokenizer(src).tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert ".for_start_0:" in result
+        assert ".for_end_0:" in result
+
+    def test_for_emits_condition_check(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        src = "for (int64 i = 0; i < 10; i++) { print i; }"
+        tokens = Tokenizer(src).tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "cmp rax, 0" in result
+        assert "je .for_end_0" in result
+
+    def test_for_emits_jump_back(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        src = "for (int64 i = 0; i < 5; i++) { print i; }"
+        tokens = Tokenizer(src).tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "jmp .for_start_0" in result
+
+    def test_for_body_has_scope_cleanup(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        src = "for (int64 i = 0; i < 3; i++) { int64 y = 1; print y; }"
+        tokens = Tokenizer(src).tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        body_start = result.index(".for_start_0:")
+        body_end = result.index(".for_end_0:")
+        body = result[body_start:body_end]
+        assert "sub rsp, 8" in body
+        assert "add rsp, 8" in body
+
+    def test_for_no_condition_no_je(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        src = "for (int64 i = 0;; i++) { print i; }"
+        tokens = Tokenizer(src).tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "je .for_end_0" not in result
+        assert "jmp .for_start_0" in result
+
+    def test_for_with_var_after_loop(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        src = "for (int64 i = 0; i < 2; i++) { print i; }\nint64 z = 99;\nexit z;"
+        tokens = Tokenizer(src).tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert ".for_start_0:" in result
+        assert ".for_end_0:" in result
+        assert "push 99" in result
 
