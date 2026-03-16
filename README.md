@@ -5,6 +5,7 @@ A compiler for a minimal programming language that compiles to x86 assembly (NAS
 ## Language Features
 
 - `int64` — declare Int64 variables
+- `char` — declare character variables (single-byte, single-quoted literals with escape sequences)
 - `const` — declare constant (immutable) variables
 - `=` — reassign variables
 - `{ }` — scoped blocks with local variables
@@ -69,6 +70,11 @@ while (i != 5) {
 for (int64 j = 0; j < 3; j++) {
   print j;
 }
+
+# characters
+char c = 'A';
+print c;
+print '\n';
 
 exit 0;
 ```

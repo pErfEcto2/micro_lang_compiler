@@ -824,3 +824,128 @@ class TestRuntimeForLoop:
         src = "int64 sum = 0;\nfor (int64 i = 0; i < 5; ++i) {\n  sum = sum + i;\n}\nexit sum;"
         result = run_executable(src)
         assert result.returncode == 10  # 0+1+2+3+4
+
+
+class TestMainCharStatement:
+    def test_char_creates_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("char c = 'a';\nexit c;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "byte [rbp - 8]" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_char_print_creates_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("char c = 'a';\nprint c;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert 'char_fmt_str' in content
+                assert "call printf" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_const_char_creates_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("const char c = 'x';\nexit c;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "byte [rbp - 8]" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_const_char_reassign_fails(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("const char c = 'a';\nc = 'b';")
+            src_path = f.name
+
+        try:
+            result = run_compiler("-n", src_path)
+            assert result.returncode != 0
+        finally:
+            os.unlink(src_path)
+
+    def test_verbose_char_shows_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("char c = 'a';\nprint c;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-v", "-o", out_path, src_path)
+                assert "byte [rbp - 8]" in result.stdout
+        finally:
+            os.unlink(src_path)
+
+
+class TestRuntimeChar:
+    def test_char_exit_code(self):
+        result = run_executable("char c = 'A';\nexit c;")
+        assert result.returncode == ord("A")
+
+    def test_char_print_compiles(self):
+        """Char print compiles and runs without crashing"""
+        result = run_executable("char c = 'a';\nprint c;\nexit 0;")
+        assert result.returncode == 0
+
+    def test_char_escape_newline_compiles(self):
+        """Printing an escape char compiles and runs without crashing"""
+        result = run_executable("print '\\n';\nexit 0;")
+        assert result.returncode == 0
+
+    def test_char_assign(self):
+        result = run_executable("char c = 'a';\nc = 'z';\nexit c;")
+        assert result.returncode == ord("z")
+
+    def test_char_in_scope(self):
+        src = "char c = 'a';\n{ char c = 'b';\nexit c; }"
+        result = run_executable(src)
+        assert result.returncode == ord("b")
+
+    def test_const_char_value(self):
+        result = run_executable("const char c = 'X';\nexit c;")
+        assert result.returncode == ord("X")
+
+    def test_char_and_int64_together(self):
+        src = "char c = 'A';\nint64 x = 42;\nexit c;"
+        result = run_executable(src)
+        assert result.returncode == ord("A")
+
+    def test_char_wraps_at_256(self):
+        """Assigning 256 to a char should wrap to 0 (byte-sized storage)"""
+        src = "char c = 'a';\nc = 256;\nexit c;"
+        result = run_executable(src)
+        assert result.returncode == 0
+
+    def test_char_increment(self):
+        src = "char c = 'a';\nc++;\nexit c;"
+        result = run_executable(src)
+        assert result.returncode == ord("b")
+
+    def test_char_decrement(self):
+        src = "char c = 'b';\nc--;\nexit c;"
+        result = run_executable(src)
+        assert result.returncode == ord("a")

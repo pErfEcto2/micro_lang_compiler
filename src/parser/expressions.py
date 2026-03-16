@@ -18,13 +18,13 @@ class INT_EXPRESSION(EXPRESSION):
     def __str__(self) -> str:
         return f"{self.val}"
 
-class STR_EXPRESSION(EXPRESSION):
-    def __init__(self, line_number: int, val: str) -> None:
+class CHAR_EXPRESSION(EXPRESSION):
+    def __init__(self, line_number: int, val: int) -> None:
         super().__init__(line_number)
-        self.val: str = val
+        self.val: int = val
 
     def __str__(self) -> str:
-        return f"{self.val}"
+        return f"'{chr(self.val)}'"
 
 class BINARY_EXPRESSION(EXPRESSION):
     def __init__(self, line_number: int, lval: EXPRESSION, op: MATH_OPERATION, rval: EXPRESSION) -> None:

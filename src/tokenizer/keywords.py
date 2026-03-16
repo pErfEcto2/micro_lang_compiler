@@ -92,6 +92,14 @@ class INT64_KEYWORD(KEYWORD):
     def __str__(self) -> str:
         return "int64"
 
+@register_keyword("char")
+class CHAR_KEYWORD(KEYWORD):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+
+    def __str__(self) -> str:
+        return "char"
+
 @register_keyword("print")
 class PRINT_KEYWORD(KEYWORD):
     def __init__(self, line_num: int) -> None:

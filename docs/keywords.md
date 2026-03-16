@@ -5,7 +5,7 @@
 | Keyword | Description |
 |---------|-------------|
 | `int64` | Declare an int64 variable |
-| `char` | Declare a char variable *(not implemented)* |
+| `char` | Declare a char variable |
 | `float64` | Declare a float64 variable *(not implemented)* |
 | `exit` | Exit a program with given return code |
 | `print` | Print int64 to the console |

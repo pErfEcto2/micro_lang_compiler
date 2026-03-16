@@ -22,6 +22,45 @@ int64 a = 60 + 2 * 4;
 int64 b = a + 1;
 ```
 
+### Characters
+
+Declare character variables with `char`. Character literals use single quotes:
+
+```
+char c = 'a';
+char newline = '\n';
+```
+
+Characters are stored as single bytes. Supported escape sequences: `\n`, `\t`, `\\`, `\0`, `\'`.
+
+Characters can be printed with `print`:
+
+```
+char c = 'a';
+print c;
+print '\n';
+```
+
+Output: `a` (followed by a newline).
+
+Characters can be used in expressions and with increment/decrement:
+
+```
+char c = 'a';
+c++;
+print c;
+print '\n';
+```
+
+Output: `b`.
+
+Characters can be declared as constants:
+
+```
+const char c = 'x';
+print c;
+```
+
 ### Constants
 
 Declare constant (immutable) variables with `const`:

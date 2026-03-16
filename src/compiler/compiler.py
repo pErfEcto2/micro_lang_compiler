@@ -1,24 +1,24 @@
-from parser.expressions import BINARY_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION
+from parser.expressions import BINARY_EXPRESSION, CHAR_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION
 from parser.program import PROGRAM
-from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, FOR_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT, VARIABLE_TYPE, WHILE_STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CHAR_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, FOR_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT, VARIABLE_TYPE, WHILE_STATEMENT
 from tokenizer.keywords import DECREMENT_KEYWORD, EQUALS_KEYWORD, GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INCREMENT_KEYWORD, INT_DIVISION_KEYWORD, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, PLUS_KEYWORD, UNARY_MATH_OPERATION
 
 
 class Scope:
     def __init__(self, line_number: int, stack_offset: int = 0) -> None:
-        self._vars: dict[str, int] = {}
-        self._consts: dict[str, int] = {}
+        self._vars: dict[str, tuple[int, int]] = {}
+        self._consts: dict[str, tuple[int, int]] = {}
         self._size: int = 0
         self._stack_offset: int = stack_offset
         self.line_number: int = line_number
 
-    def add_var(self, var_name: str) -> None:
-        self._size += 1
-        self._vars[var_name] = self._size + self._stack_offset
+    def add_var(self, var_name: str, var_size: int) -> None:
+        self._size += 8
+        self._vars[var_name] = (var_size, self._size + self._stack_offset)
 
-    def add_const(self, const_name: str) -> None:
-        self._size += 1
-        self._consts[const_name] = self._size + self._stack_offset
+    def add_const(self, const_name: str, const_size: int) -> None:
+        self._size += 8
+        self._consts[const_name] = (const_size, self._size + self._stack_offset)
 
     def has_var(self, name: str) -> bool:
         return name in self._vars
@@ -29,7 +29,10 @@ class Scope:
     def has(self, name: str) -> bool:
         return self.has_var(name) or self.has_const(name)
 
-    def get(self, name: str) -> int:
+    def get(self, name: str) -> tuple[int, int]:
+        """
+        returns: tuple[size, stack_offset]
+        """
         if name in self._vars:
             return self._vars[name]
         return self._consts[name]
@@ -48,23 +51,25 @@ class Compiler:
         self._externs: set[str] = set()
         self._asm: list[str] = []
         self._scopes: list[Scope] = [Scope(0)]
-        self._qword_size: int = 8
         self._label_count: int = 0
 
     def _gen_label(self) -> int:
         self._label_count += 1
         return self._label_count - 1
 
-    def _add_const(self, name: str) -> None:
-        self._scopes[-1].add_const(name)
+    def _add_const(self, name: str, const_size: int) -> None:
+        self._scopes[-1].add_const(name, const_size)
 
-    def _add_var(self, name: str) -> None:
-        self._scopes[-1].add_var(name)
+    def _add_var(self, name: str, var_size: int) -> None:
+        self._scopes[-1].add_var(name, var_size)
 
-    def _get_stack_offset(self, name: str) -> int:
+    def _get_stack_offset(self, name: str) -> tuple[int, int]:
+        """
+        returns: tuple[size, stack_offset]
+        """
         for scope in reversed(self._scopes):
             if scope.has(name):
-                return self._qword_size * scope.get(name)
+                return scope.get(name)
 
         raise ValueError(f"unknown identifier '{name}'")
 
@@ -105,7 +110,8 @@ class Compiler:
 
     def _gen_data_s(self) -> None:
         self._asm.append("section .data")
-        self._asm.append("    int_fmt_str db \"%d\", 10, 0")
+        for data in self._data_s:
+            self._asm.append(f"    {data}")
 
     def _gen_text_s(self) -> None:
         for text in self._text_s:
@@ -190,8 +196,9 @@ class Compiler:
 
     def _eval_expr(self, expr: EXPRESSION) -> None:
         match expr:
-            case INT_EXPRESSION():
+            case INT_EXPRESSION() | CHAR_EXPRESSION():
                 self._push(str(expr.val))
+
             case BINARY_EXPRESSION():
                 self._eval_expr(expr.rval)
                 self._eval_expr(expr.lval)
@@ -248,11 +255,19 @@ class Compiler:
                     case _:
                         raise ValueError(f"invalid operation type '{type(expr.op)}' ('{MATH_OPERATION}' expected)")
             case IDENTIFIER_EXPRESSION():
+
                 if not self._has_var_or_const(expr.name):
                     raise ValueError(f"unknown identifier '{expr.name}' in line {expr.line_number}")
 
-                stack_offset = self._get_stack_offset(expr.name)
-                self._mov("rax", f"qword [rbp - {stack_offset}]")
+                size, stack_offset = self._get_stack_offset(expr.name)
+                match size:
+                    case 1:
+                        self._movzx("rax", f"byte [rbp - {stack_offset}]")
+                    case 8:
+                        self._mov("rax", f"qword [rbp - {stack_offset}]")
+                    case _:
+                        raise ValueError(f"invalid expression size in line {expr.line_number}")
+
                 self._push("rax")
 
             case POSTFIX_EXPRESSION():
@@ -265,13 +280,23 @@ class Compiler:
                 else:
                     raise ValueError(f"unknown identifier '{expr.identifier.name}' in line {expr.identifier.line_number}")
 
-                stack_offset = self._get_stack_offset(expr.identifier.name)
-                self._push(f"qword [rbp - {stack_offset}]")
+                size, stack_offset = self._get_stack_offset(expr.identifier.name)
+                match size:
+                    case 1:
+                        var_size = "byte"
+                        self._movzx("rax", f"{var_size} [rbp - {stack_offset}]")
+                        self._push(f"rax")
+                    case 8:
+                        var_size = "qword"
+                        self._push(f"{var_size} [rbp - {stack_offset}]")
+                    case _:
+                        raise ValueError(f"invalid postfix expression size in line {expr.line_number}")
+
                 match expr.op:
                     case INCREMENT_KEYWORD():
-                        self._inc(f"qword [rbp - {stack_offset}]")
+                        self._inc(f"{var_size} [rbp - {stack_offset}]")
                     case DECREMENT_KEYWORD():
-                        self._dec(f"qword [rbp - {stack_offset}]")
+                        self._dec(f"{var_size} [rbp - {stack_offset}]")
 
             case PREFIX_EXPRESSION():
                 for scope in reversed(self._scopes):
@@ -283,13 +308,27 @@ class Compiler:
                 else:
                     raise ValueError(f"unknown identifier '{expr.identifier.name}' in line {expr.identifier.line_number}")
 
-                stack_offset = self._get_stack_offset(expr.identifier.name)
+                size, stack_offset = self._get_stack_offset(expr.identifier.name)
+                match size:
+                    case 1:
+                        var_size = "byte"
+                    case 8:
+                        var_size = "qword"
+                    case _:
+                        raise ValueError(f"invalid postfix expression size in line {expr.line_number}")
+
                 match expr.op:
                     case INCREMENT_KEYWORD():
-                        self._inc(f"qword [rbp - {stack_offset}]")
+                        self._inc(f"{var_size} [rbp - {stack_offset}]")
                     case DECREMENT_KEYWORD():
-                        self._dec(f"qword [rbp - {stack_offset}]")
-                self._push(f"qword [rbp - {stack_offset}]")
+                        self._dec(f"{var_size} [rbp - {stack_offset}]")
+
+                match size:
+                    case 1:
+                        self._movzx("rax", f"{var_size} [rbp - {stack_offset}]")
+                        self._push(f"rax")
+                    case 8:
+                        self._push(f"{var_size} [rbp - {stack_offset}]")
 
             case _:
                 raise ValueError(f"unexpected expression '{expr}' in line {expr.line_number}")
@@ -305,12 +344,12 @@ class Compiler:
         if current_scope.has_const(identifier.name):
             raise ValueError(f"constant {identifier} already exists (line {identifier.line_number})")
         elif not current_scope.has_var(identifier.name):
-            self._add_var(identifier.name)
+            self._add_var(identifier.name, 8)
         else:
             raise ValueError(f"identifier {identifier} already exists (line {identifier.line_number})")
 
-        stack_offset = self._get_stack_offset(identifier.name)
-        self._sub("rsp", str(self._qword_size))
+        size, stack_offset = self._get_stack_offset(identifier.name)
+        self._sub("rsp", "8")
         self._eval_expr(expr)
         self._pop("rax")
         self._mov(f"qword [rbp - {stack_offset}]", "rax")
@@ -318,8 +357,52 @@ class Compiler:
     def _gen_print(self, expr: EXPRESSION) -> None:
         self._externs.add("printf")
         self._eval_expr(expr)
+
+        match expr:
+            case CHAR_EXPRESSION():
+                fmt = "char_fmt_str"
+                self._data_s.add(f"{fmt} db \"%c\", 0")
+            case IDENTIFIER_EXPRESSION():
+                size, _ = self._get_stack_offset(expr.name)
+                match size:
+                    case 1:
+                        fmt = "char_fmt_str"
+                        self._data_s.add(f"{fmt} db \"%c\", 0")
+                    case 8:
+                        fmt = "int64_fmt_str"
+                        self._data_s.add(f"{fmt} db \"%lld\", 0")
+                    case _:
+                        raise ValueError(f"invalid expression size in line {expr.line_number}")
+            case INT_EXPRESSION() | BINARY_EXPRESSION():
+                fmt = "int64_fmt_str"
+                self._data_s.add(f"{fmt} db \"%lld\", 0")
+            case POSTFIX_EXPRESSION():
+                size, _ = self._get_stack_offset(expr.identifier.name)
+                match size:
+                    case 1:
+                        fmt = "char_fmt_str"
+                        self._data_s.add(f"{fmt} db \"%c\", 0")
+                    case 8:
+                        fmt = "int64_fmt_str"
+                        self._data_s.add(f"{fmt} db \"%lld\", 0")
+                    case _:
+                        raise ValueError(f"invalid expression size in line {expr.line_number}")
+            case PREFIX_EXPRESSION():
+                size, _ = self._get_stack_offset(expr.identifier.name)
+                match size:
+                    case 1:
+                        fmt = "char_fmt_str"
+                        self._data_s.add(f"{fmt} db \"%c\", 0")
+                    case 8:
+                        fmt = "int64_fmt_str"
+                        self._data_s.add(f"{fmt} db \"%lld\", 0")
+                    case _:
+                        raise ValueError(f"invalid expression size in line {expr.line_number}")
+            case _:
+                raise ValueError(f"invalid expression in line {expr.line_number}")
+
         self._pop("rsi")
-        self._lea("rdi", "[int_fmt_str]")
+        self._lea("rdi", f"[{fmt}]")
         self._mov("rax", "0")
         self._call("printf")
 
@@ -334,9 +417,18 @@ class Compiler:
             raise ValueError(f"unknown identifier '{identifier.name}' in line {identifier.line_number}")
 
         self._eval_expr(expr)
+        size, stack_offset = self._get_stack_offset(identifier.name)
+        match size:
+            case 1:
+                register = "al"
+                var_size = "byte"
+            case 8:
+                register = "rax"
+                var_size = "qword"
+            case _:
+                raise ValueError(f"invalid variable size in line {identifier.line_number}")
         self._pop("rax")
-        stack_offset = self._get_stack_offset(identifier.name)
-        self._mov(f"qword [rbp - {stack_offset}]", "rax")
+        self._mov(f"{var_size} [rbp - {stack_offset}]", register)
 
     def _gen_const(self, var_statement: VARIABLE_TYPE) -> None:
         identifier = var_statement.identifier
@@ -346,15 +438,24 @@ class Compiler:
         if current_scope.has_var(identifier.name):
             raise ValueError(f"identifier {identifier} already exists (line {identifier.line_number})")
         elif not current_scope.has_const(identifier.name):
-            self._add_const(identifier.name)
+            self._add_const(identifier.name, var_statement.size)
         else:
             raise ValueError(f"constant {identifier} already exists (line {identifier.line_number})")
 
-        stack_offset = self._get_stack_offset(identifier.name)
-        self._sub("rsp", str(self._qword_size))
+        size, stack_offset = self._get_stack_offset(identifier.name)
+        self._sub("rsp", "8")
         self._eval_expr(expr)
+        match size:
+            case 1:
+                register = "al"
+                var_size = "byte"
+            case 8:
+                register = "rax"
+                var_size = "qword"
+            case _:
+                raise ValueError(f"invalid constant size in line {identifier.line_number}")
         self._pop("rax")
-        self._mov(f"qword [rbp - {stack_offset}]", "rax")
+        self._mov(f"{var_size} [rbp - {stack_offset}]", register)
 
     def _add_scope(self, line_number: int) -> None:
         stack_offset = self._scopes[-1].get_stack_offset()
@@ -363,7 +464,7 @@ class Compiler:
     def _remove_scope(self) -> None:
         scope = self._scopes.pop()
         if scope.get_size() > 0:
-            self._add("rsp", str(scope.get_size() * self._qword_size))
+            self._add("rsp", str(scope.get_size()))
 
     def _gen_if(self, expr: EXPRESSION, true_body: list[STATEMENT], false_body: list[STATEMENT] | None = None) -> None:
         label_id = self._gen_label()
@@ -417,12 +518,20 @@ class Compiler:
         else:
             raise ValueError(f"unknown identifier '{identifier.name}' in line {identifier.line_number}")
 
-        stack_offset = self._get_stack_offset(identifier.name)
+        size, stack_offset = self._get_stack_offset(identifier.name)
+        match size:
+            case 1:
+                var_size = "byte"
+            case 8:
+                var_size = "qword"
+            case _:
+                raise ValueError(f"invalid expression size in line {identifier.line_number}")
+
         match op:
             case INCREMENT_KEYWORD():
-                self._inc(f"qword [rbp - {stack_offset}]")
+                self._inc(f"{var_size} [rbp - {stack_offset}]")
             case DECREMENT_KEYWORD():
-                self._dec(f"qword [rbp - {stack_offset}]")
+                self._dec(f"{var_size} [rbp - {stack_offset}]")
             case _:
                 raise ValueError(f"unknown unary math operation '{op}' in line {op.line_number}")
 
@@ -456,8 +565,25 @@ class Compiler:
 
         self._remove_scope()
 
+    def _gen_char(self, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION) -> None:
+        current_scope = self._scopes[-1]
+        if current_scope.has_const(identifier.name):
+            raise ValueError(f"constant {identifier} already exists (line {identifier.line_number})")
+        elif not current_scope.has_var(identifier.name):
+            self._add_var(identifier.name, 1)
+        else:
+            raise ValueError(f"identifier {identifier} already exists (line {identifier.line_number})")
+
+        _, stack_offset = self._get_stack_offset(identifier.name)
+        self._sub("rsp", "8")
+        self._eval_expr(expr)
+        self._pop("rax")
+        self._mov(f"byte [rbp - {stack_offset}]", "al")
+
     def _compile_statement(self, statement) -> None:
         match statement:
+            case CHAR_STATEMENT():
+                self._gen_char(statement.identifier, statement.expr)
             case FOR_STATEMENT():
                 self._gen_for(statement.line_number, statement.body, statement.initialization, statement.condition, statement.increment)
             case POSTFIX_STATEMENT() | PREFIX_STATEMENT():

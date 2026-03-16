@@ -540,15 +540,15 @@ class TestTokenizerRepr:
         tokens = Tokenizer("foo").tokenize()
         assert repr(tokens[0]) == "foo"
 
-    def test_str_literal_repr(self):
-        from tokenizer.literals import STR_LITERAL
-        lit = STR_LITERAL(1, "hello")
-        assert repr(lit) == "hello"
+    def test_char_literal_repr(self):
+        from tokenizer.literals import CHAR_LITERAL
+        lit = CHAR_LITERAL(1, ord("a"))
+        assert repr(lit) == "'a'"
 
-    def test_str_literal_str(self):
-        from tokenizer.literals import STR_LITERAL
-        lit = STR_LITERAL(1, "world")
-        assert str(lit) == "world"
+    def test_char_literal_str(self):
+        from tokenizer.literals import CHAR_LITERAL
+        lit = CHAR_LITERAL(1, ord("b"))
+        assert str(lit) == "'b'"
 
 
 class TestTokenizerWhileKeyword:
@@ -982,3 +982,113 @@ class TestTokenizerIncrementDecrement:
         assert isinstance(tokens[1], PLUS_KEYWORD)
         assert isinstance(tokens[2], INCREMENT_KEYWORD)
         assert isinstance(tokens[3], IDENTIFIER)
+
+
+class TestTokenizerCharKeyword:
+    def test_char_keyword(self):
+        from tokenizer.keywords import CHAR_KEYWORD
+        tokens = Tokenizer("char").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], CHAR_KEYWORD)
+
+    def test_char_keyword_repr(self):
+        tokens = Tokenizer("char").tokenize()
+        assert repr(tokens[0]) == "char"
+
+    def test_char_not_identifier(self):
+        from tokenizer.keywords import CHAR_KEYWORD
+        tokens = Tokenizer("char").tokenize()
+        assert not isinstance(tokens[0], IDENTIFIER)
+        assert isinstance(tokens[0], CHAR_KEYWORD)
+
+    def test_charvar_is_identifier(self):
+        tokens = Tokenizer("charvar").tokenize()
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert tokens[0].val == "charvar"
+
+    def test_char_statement_tokens(self):
+        from tokenizer.keywords import CHAR_KEYWORD, ASSIGN_KEYWORD
+        from tokenizer.literals import CHAR_LITERAL
+        tokens = Tokenizer("char x = 'a';").tokenize()
+        assert len(tokens) == 5
+        assert isinstance(tokens[0], CHAR_KEYWORD)
+        assert isinstance(tokens[1], IDENTIFIER)
+        assert tokens[1].val == "x"
+        assert isinstance(tokens[2], ASSIGN_KEYWORD)
+        assert isinstance(tokens[3], CHAR_LITERAL)
+        assert tokens[3].val == ord("a")
+        assert isinstance(tokens[4], SEMICOLON)
+
+
+class TestTokenizerCharLiteral:
+    def test_simple_char(self):
+        from tokenizer.literals import CHAR_LITERAL
+        tokens = Tokenizer("'a'").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], CHAR_LITERAL)
+        assert tokens[0].val == ord("a")
+
+    def test_char_repr(self):
+        tokens = Tokenizer("'z'").tokenize()
+        assert repr(tokens[0]) == "'z'"
+
+    def test_char_digit(self):
+        from tokenizer.literals import CHAR_LITERAL
+        tokens = Tokenizer("'0'").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], CHAR_LITERAL)
+        assert tokens[0].val == ord("0")
+
+    def test_char_space(self):
+        from tokenizer.literals import CHAR_LITERAL
+        tokens = Tokenizer("' '").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], CHAR_LITERAL)
+        assert tokens[0].val == ord(" ")
+
+    def test_escape_newline(self):
+        from tokenizer.literals import CHAR_LITERAL
+        tokens = Tokenizer(r"'\n'").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], CHAR_LITERAL)
+        assert tokens[0].val == ord("\n")
+
+    def test_escape_tab(self):
+        from tokenizer.literals import CHAR_LITERAL
+        tokens = Tokenizer(r"'\t'").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], CHAR_LITERAL)
+        assert tokens[0].val == ord("\t")
+
+    def test_escape_backslash(self):
+        from tokenizer.literals import CHAR_LITERAL
+        tokens = Tokenizer("'\\\\'").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], CHAR_LITERAL)
+        assert tokens[0].val == ord("\\")
+
+    def test_escape_null(self):
+        from tokenizer.literals import CHAR_LITERAL
+        tokens = Tokenizer(r"'\0'").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], CHAR_LITERAL)
+        assert tokens[0].val == 0
+
+    def test_escape_single_quote(self):
+        from tokenizer.literals import CHAR_LITERAL
+        tokens = Tokenizer("'\\''").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], CHAR_LITERAL)
+        assert tokens[0].val == ord("'")
+
+    def test_unclosed_char_raises(self):
+        with pytest.raises(ValueError, match="expected closing quote"):
+            Tokenizer("'ab").tokenize()
+
+    def test_invalid_escape_raises(self):
+        with pytest.raises(ValueError, match="invalid char"):
+            Tokenizer("'\\x'").tokenize()
+
+    def test_char_preserves_line_number(self):
+        tokens = Tokenizer("\n'a'").tokenize()
+        assert tokens[0].line_number == 2

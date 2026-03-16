@@ -22,10 +22,11 @@ class EXIT_STATEMENT(STATEMENT):
         return f"EXIT_STATEMENT(ret: {self.return_code})"
 
 class VARIABLE_TYPE(STATEMENT):
-    def __init__(self, line_number: int, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION) -> None:
+    def __init__(self, line_number: int, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION, size: int) -> None:
         super().__init__(line_number)
         self.identifier: IDENTIFIER_EXPRESSION =  identifier
         self.expr: EXPRESSION = expr
+        self.size: int = size
 
 class CONST_STATEMENT(STATEMENT):
     def __init__(self, line_number: int, var_statement: VARIABLE_TYPE) -> None:
@@ -37,10 +38,17 @@ class CONST_STATEMENT(STATEMENT):
 
 class INT64_STATEMENT(VARIABLE_TYPE):
     def __init__(self, line_number: int, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION) -> None:
-        super().__init__(line_number, identifier, expr)
+        super().__init__(line_number, identifier, expr, 8)
 
     def __str__(self) -> str:
         return f"INT64_STATEMENT(identifier: {self.identifier}, expr: {self.expr})"
+
+class CHAR_STATEMENT(VARIABLE_TYPE):
+    def __init__(self, line_number: int, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION) -> None:
+        super().__init__(line_number, identifier, expr, 1)
+
+    def __str__(self) -> str:
+        return f"CHAR_STATEMENT(identifier: {self.identifier}, expr: {self.expr})"
 
 class IF_STATEMENT(STATEMENT):
     def __init__(self, line_number: int, expr: EXPRESSION, true_body: list[STATEMENT], false_body: list[STATEMENT] | None = None) -> None:

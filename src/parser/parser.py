@@ -1,8 +1,8 @@
-from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, FOR_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT, WHILE_STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CHAR_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, FOR_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT, WHILE_STATEMENT
 from parser.program import PROGRAM
-from parser.expressions import BINARY_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION
-from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, ELSE_KEYWORD, EXIT_KEYWORD, FOR_KEYWORD, IF_KEYWORD, INT64_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MULTIPLY_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PRINT_KEYWORD, SEMICOLON, UNARY_MATH_OPERATION, WHILE_KEYWORD
-from tokenizer.literals import INT_LITERAL
+from parser.expressions import BINARY_EXPRESSION, CHAR_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION
+from tokenizer.keywords import ASSIGN_KEYWORD, CHAR_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, ELSE_KEYWORD, EXIT_KEYWORD, FOR_KEYWORD, IF_KEYWORD, INT64_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MULTIPLY_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PRINT_KEYWORD, SEMICOLON, UNARY_MATH_OPERATION, WHILE_KEYWORD
+from tokenizer.literals import CHAR_LITERAL, INT_LITERAL
 from tokenizer.tokens import IDENTIFIER, Token
 
 
@@ -73,6 +73,10 @@ class Parser:
                     op = self._consume()
                     left = POSTFIX_EXPRESSION(ln, left, op)
                 return self._get_expr(left, min_bp, ln)
+
+            case CHAR_LITERAL():
+                left = CHAR_EXPRESSION(ln, token.val)
+                return self._get_expr(left, min_bp, ln)
                 
             case _:
                 raise ValueError(f"unexpected expression '{token}' in line {ln}")
@@ -118,6 +122,8 @@ class Parser:
         match t:
             case INT64_KEYWORD():
                 return CONST_STATEMENT(ln, self._parse_int64_statement())
+            case CHAR_KEYWORD():
+                return CONST_STATEMENT(ln, self._parse_char_statement())
             case _:
                 raise ValueError(f"unknown type '{type(t)}' in line {t.line_number}")
 
@@ -198,8 +204,24 @@ class Parser:
 
         return FOR_STATEMENT(ln, body, init, cond, inc)
 
+    def _parse_char_statement(self, expect_semicolon: bool = True) -> CHAR_STATEMENT:
+        self._assert_current_token_type(IDENTIFIER)
+        identifier = self._consume()
+        identifier = IDENTIFIER_EXPRESSION(identifier.line_number, identifier.val)
+        self._assert_current_token_type(ASSIGN_KEYWORD)
+        self._consume()
+
+        expr = self._parse_expr(self._consume())
+        
+        if expect_semicolon:
+            self._assert_current_token_type(SEMICOLON)
+            self._consume()
+        return CHAR_STATEMENT(expr.line_number, identifier, expr)
+
     def _create_statement(self, token, expect_semicolon: bool = True) -> STATEMENT | None:
         match token:
+            case CHAR_KEYWORD():
+                return self._parse_char_statement(expect_semicolon=expect_semicolon)
             case FOR_KEYWORD():
                 return self._parse_for_statement(token.line_number)
             case UNARY_MATH_OPERATION():

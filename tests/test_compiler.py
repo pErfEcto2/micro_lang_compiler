@@ -1,8 +1,8 @@
 import pytest
 from compiler.compiler import Compiler
 from parser.program import PROGRAM
-from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, FOR_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT
-from parser.expressions import BINARY_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION, STR_EXPRESSION
+from parser.statements import ASSIGN_STATEMENT, CHAR_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, FOR_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT
+from parser.expressions import BINARY_EXPRESSION, CHAR_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION
 from tokenizer.keywords import DECREMENT_KEYWORD, EQUALS_KEYWORD, GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INCREMENT_KEYWORD, INT_DIVISION_KEYWORD, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, PLUS_KEYWORD
 
 
@@ -38,12 +38,11 @@ class TestCompilerPrefix:
         result = Compiler(_make_program()).compile()
         lines = result.split("\n")
         assert lines[0] == "section .data"
-        assert lines[1] == '    int_fmt_str db "%d", 10, 0'
-        assert lines[2] == "section .text"
-        assert lines[3] == "global main"
-        assert lines[4] == "main:"
-        assert lines[5] == "    push rbp"
-        assert lines[6] == "    mov rbp, rsp"
+        assert lines[1] == "section .text"
+        assert lines[2] == "global main"
+        assert lines[3] == "main:"
+        assert lines[4] == "    push rbp"
+        assert lines[5] == "    mov rbp, rsp"
 
 
 class TestCompilerSuffix:
@@ -80,15 +79,16 @@ class TestCompilerExitStatement:
         assert "    push 255" in result
         assert "    pop rdi" in result
 
-    def test_exit_with_str_raises(self):
-        prog = _make_program(EXIT_STATEMENT(1, STR_EXPRESSION(1, "hello")))
-        with pytest.raises(ValueError, match="unexpected expression"):
-            Compiler(prog).compile()
+    def test_exit_with_char(self):
+        prog = _make_program(EXIT_STATEMENT(1, CHAR_EXPRESSION(1, ord("A"))))
+        result = Compiler(prog).compile()
+        assert f"    push {ord('A')}" in result
+        assert "    pop rdi" in result
 
-    def test_exit_str_error_reports_line(self):
-        prog = _make_program(EXIT_STATEMENT(5, STR_EXPRESSION(5, "x")))
-        with pytest.raises(ValueError, match="line 5"):
-            Compiler(prog).compile()
+    def test_exit_with_char_preserves_line(self):
+        prog = _make_program(EXIT_STATEMENT(5, CHAR_EXPRESSION(5, ord("x"))))
+        result = Compiler(prog).compile()
+        assert f"    push {ord('x')}" in result
 
 
 class TestCompilerMultipleStatements:
@@ -118,7 +118,6 @@ class TestCompilerFullOutput:
         result = Compiler(_make_program()).compile()
         expected = "\n".join([
             "section .data",
-            '    int_fmt_str db "%d", 10, 0',
             "section .text",
             "global main",
             "main:",
@@ -135,7 +134,6 @@ class TestCompilerFullOutput:
         result = Compiler(prog).compile()
         expected = "\n".join([
             "section .data",
-            '    int_fmt_str db "%d", 10, 0',
             "section .text",
             "global main",
             "main:",
@@ -550,9 +548,10 @@ class TestCompilerPrintStatement:
         assert "extern printf" in result
         assert "    push 42" in result
         assert "    pop rsi" in result
-        assert '    lea rdi, [int_fmt_str]' in result
+        assert '    lea rdi, [int64_fmt_str]' in result
         assert "    mov rax, 0" in result
         assert "    call printf" in result
+        assert 'int64_fmt_str db "%lld", 0' in result
 
     def test_print_var(self):
         prog = _make_program(
@@ -1406,4 +1405,117 @@ class TestCompilerForStatement:
         assert ".for_start_0:" in result
         assert ".for_end_0:" in result
         assert "push 99" in result
+
+
+class TestCompilerCharStatement:
+    def test_simple_char(self):
+        prog = _make_program(
+            CHAR_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "c"), CHAR_EXPRESSION(1, ord("a")))
+        )
+        result = Compiler(prog).compile()
+        assert "    sub rsp, 8" in result
+        assert f"    push {ord('a')}" in result
+        assert "    pop rax" in result
+        assert "    mov byte [rbp - 8], al" in result
+
+    def test_char_and_exit(self):
+        prog = _make_program(
+            CHAR_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "c"), CHAR_EXPRESSION(1, ord("A"))),
+            EXIT_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "c")),
+        )
+        result = Compiler(prog).compile()
+        assert "    mov byte [rbp - 8], al" in result
+        assert "    movzx rax, byte [rbp - 8]" in result
+        assert "    pop rdi" in result
+
+    def test_char_print(self):
+        prog = _make_program(
+            CHAR_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "c"), CHAR_EXPRESSION(1, ord("a"))),
+            PRINT_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "c")),
+        )
+        result = Compiler(prog).compile()
+        assert "extern printf" in result
+        assert '    lea rdi, [char_fmt_str]' in result
+        assert 'char_fmt_str db "%c", 0' in result
+        assert "    call printf" in result
+
+    def test_print_char_literal(self):
+        prog = _make_program(
+            PRINT_STATEMENT(1, CHAR_EXPRESSION(1, ord("z"))),
+        )
+        result = Compiler(prog).compile()
+        assert '    lea rdi, [char_fmt_str]' in result
+        assert 'char_fmt_str db "%c", 0' in result
+
+    def test_two_chars_different_offsets(self):
+        prog = _make_program(
+            CHAR_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "a"), CHAR_EXPRESSION(1, ord("x"))),
+            CHAR_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "b"), CHAR_EXPRESSION(2, ord("y"))),
+        )
+        result = Compiler(prog).compile()
+        assert "    mov byte [rbp - 8], al" in result
+        assert "    mov byte [rbp - 16], al" in result
+
+    def test_duplicate_char_raises(self):
+        prog = _make_program(
+            CHAR_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "c"), CHAR_EXPRESSION(1, ord("a"))),
+            CHAR_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "c"), CHAR_EXPRESSION(2, ord("b"))),
+        )
+        with pytest.raises(ValueError, match="already exists"):
+            Compiler(prog).compile()
+
+    def test_char_assign(self):
+        prog = _make_program(
+            CHAR_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "c"), CHAR_EXPRESSION(1, ord("a"))),
+            ASSIGN_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "c"), CHAR_EXPRESSION(2, ord("b"))),
+        )
+        result = Compiler(prog).compile()
+        assert result.count("    mov byte [rbp - 8], al") == 2
+
+    def test_const_char(self):
+        prog = _make_program(
+            CONST_STATEMENT(1, CHAR_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "c"), CHAR_EXPRESSION(1, ord("a")))),
+        )
+        result = Compiler(prog).compile()
+        assert "    mov byte [rbp - 8], al" in result
+
+    def test_const_char_reassign_raises(self):
+        prog = _make_program(
+            CONST_STATEMENT(1, CHAR_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "c"), CHAR_EXPRESSION(1, ord("a")))),
+            ASSIGN_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "c"), CHAR_EXPRESSION(2, ord("b"))),
+        )
+        with pytest.raises(ValueError, match="constant"):
+            Compiler(prog).compile()
+
+
+class TestCompilerCharIntegration:
+    def test_full_pipeline_char(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("char c = 'a';\nexit c;").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    mov byte [rbp - 8], al" in result
+        assert "    movzx rax, byte [rbp - 8]" in result
+        assert "    pop rdi" in result
+
+    def test_full_pipeline_char_print(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("char c = 'a';\nprint c;").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert 'char_fmt_str db "%c", 0' in result
+        assert "    call printf" in result
+
+    def test_full_pipeline_const_char(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("const char c = 'x';\nexit c;").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    mov byte [rbp - 8], al" in result
 

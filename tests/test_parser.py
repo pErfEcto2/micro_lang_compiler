@@ -2,9 +2,9 @@ import pytest
 from parser.parser import Parser
 from parser.program import PROGRAM
 from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, FOR_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, WHILE_STATEMENT
-from parser.expressions import BINARY_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION, STR_EXPRESSION
-from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, DECREMENT_KEYWORD, ELSE_KEYWORD, EQUALS_KEYWORD, EXIT_KEYWORD, FOR_KEYWORD, IF_KEYWORD, INCREMENT_KEYWORD, INT64_KEYWORD, LESS_KEYWORD, MINUS_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON, WHILE_KEYWORD
-from tokenizer.literals import INT_LITERAL, STR_LITERAL
+from parser.expressions import BINARY_EXPRESSION, CHAR_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION
+from tokenizer.keywords import ASSIGN_KEYWORD, CHAR_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, DECREMENT_KEYWORD, ELSE_KEYWORD, EQUALS_KEYWORD, EXIT_KEYWORD, FOR_KEYWORD, IF_KEYWORD, INCREMENT_KEYWORD, INT64_KEYWORD, LESS_KEYWORD, MINUS_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON, WHILE_KEYWORD
+from tokenizer.literals import CHAR_LITERAL, INT_LITERAL
 from tokenizer.tokens import IDENTIFIER
 
 
@@ -44,10 +44,13 @@ class TestParserExitStatement:
         stmt = program.statements[0]
         assert stmt.return_code.val == 999999
 
-    def test_exit_with_str_raises(self):
-        tokens = [EXIT_KEYWORD(1), STR_LITERAL(1, "hello"), SEMICOLON(1)]
-        with pytest.raises(ValueError, match="unexpected expression"):
-            Parser(tokens).parse()
+    def test_exit_with_char(self):
+        tokens = [EXIT_KEYWORD(1), CHAR_LITERAL(1, ord("a")), SEMICOLON(1)]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, EXIT_STATEMENT)
+        assert isinstance(stmt.return_code, CHAR_EXPRESSION)
+        assert stmt.return_code.val == ord("a")
 
     def test_exit_preserves_line_number(self):
         tokens = [EXIT_KEYWORD(5), INT_LITERAL(5, 1), SEMICOLON(5)]
@@ -133,10 +136,11 @@ class TestParserErrors:
         with pytest.raises(ValueError, match="line 7"):
             Parser(tokens).parse()
 
-    def test_exit_with_str_expression_error_reports_line(self):
-        tokens = [EXIT_KEYWORD(3), STR_LITERAL(3, "x"), SEMICOLON(3)]
-        with pytest.raises(ValueError, match="line 3"):
-            Parser(tokens).parse()
+    def test_exit_with_char_preserves_line(self):
+        tokens = [EXIT_KEYWORD(3), CHAR_LITERAL(3, ord("x")), SEMICOLON(3)]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert stmt.return_code.line_number == 3
 
 
 class TestParserExpressions:
@@ -148,22 +152,24 @@ class TestParserExpressions:
         assert expr.val == 255
         assert expr.line_number == 1
 
-    def test_str_expression_raises(self):
-        tokens = [EXIT_KEYWORD(1), STR_LITERAL(1, "world"), SEMICOLON(1)]
-        with pytest.raises(ValueError, match="unexpected expression"):
-            Parser(tokens).parse()
+    def test_char_expression_parsed(self):
+        tokens = [EXIT_KEYWORD(1), CHAR_LITERAL(1, ord("z")), SEMICOLON(1)]
+        program = Parser(tokens).parse()
+        expr = program.statements[0].return_code
+        assert isinstance(expr, CHAR_EXPRESSION)
+        assert expr.val == ord("z")
 
     def test_int_expression_repr(self):
         expr = INT_EXPRESSION(1, 42)
         assert repr(expr) == "42"
 
-    def test_str_expression_repr(self):
-        expr = STR_EXPRESSION(1, "hello")
-        assert repr(expr) == "hello"
+    def test_char_expression_repr(self):
+        expr = CHAR_EXPRESSION(1, ord("a"))
+        assert repr(expr) == "'a'"
 
-    def test_str_expression_str(self):
-        expr = STR_EXPRESSION(1, "world")
-        assert str(expr) == "world"
+    def test_char_expression_str(self):
+        expr = CHAR_EXPRESSION(1, ord("b"))
+        assert str(expr) == "'b'"
 
 
 class TestParserProgramRepr:
@@ -1652,3 +1658,106 @@ class TestParserForIntegration:
         assert stmt.initialization is None
         assert stmt.condition is None
         assert stmt.increment is None
+
+
+class TestParserCharStatement:
+    def test_simple_char(self):
+        tokens = [
+            CHAR_KEYWORD(1), IDENTIFIER(1, "c"), ASSIGN_KEYWORD(1),
+            CHAR_LITERAL(1, ord("a")), SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        from parser.statements import CHAR_STATEMENT
+        assert isinstance(stmt, CHAR_STATEMENT)
+        assert stmt.identifier.name == "c"
+        assert isinstance(stmt.expr, CHAR_EXPRESSION)
+        assert stmt.expr.val == ord("a")
+
+    def test_char_missing_identifier(self):
+        tokens = [CHAR_KEYWORD(1), INT_LITERAL(1, 5), ASSIGN_KEYWORD(1), CHAR_LITERAL(1, 65), SEMICOLON(1)]
+        with pytest.raises(ValueError, match="expected"):
+            Parser(tokens).parse()
+
+    def test_char_missing_assign(self):
+        tokens = [CHAR_KEYWORD(1), IDENTIFIER(1, "c"), CHAR_LITERAL(1, 65), SEMICOLON(1)]
+        with pytest.raises(ValueError, match="expected"):
+            Parser(tokens).parse()
+
+    def test_char_missing_semicolon(self):
+        tokens = [CHAR_KEYWORD(1), IDENTIFIER(1, "c"), ASSIGN_KEYWORD(1), CHAR_LITERAL(1, 65)]
+        with pytest.raises(ValueError, match="expected"):
+            Parser(tokens).parse()
+
+    def test_char_repr(self):
+        from parser.statements import CHAR_STATEMENT
+        stmt = CHAR_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "c"), CHAR_EXPRESSION(1, ord("a")))
+        assert "CHAR_STATEMENT" in repr(stmt)
+        assert "c" in repr(stmt)
+
+    def test_char_preserves_line_number(self):
+        tokens = [
+            CHAR_KEYWORD(3), IDENTIFIER(3, "c"), ASSIGN_KEYWORD(3),
+            CHAR_LITERAL(3, ord("z")), SEMICOLON(3),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert stmt.line_number == 3
+
+
+class TestParserConstCharStatement:
+    def test_const_char(self):
+        tokens = [
+            CONST_KEYWORD(1), CHAR_KEYWORD(1), IDENTIFIER(1, "c"), ASSIGN_KEYWORD(1),
+            CHAR_LITERAL(1, ord("x")), SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, CONST_STATEMENT)
+        from parser.statements import CHAR_STATEMENT
+        assert isinstance(stmt.var_statement, CHAR_STATEMENT)
+        assert stmt.var_statement.identifier.name == "c"
+        assert stmt.var_statement.expr.val == ord("x")
+
+    def test_full_pipeline_const_char(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("const char c = 'a';").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        assert isinstance(program.statements[0], CONST_STATEMENT)
+
+
+class TestParserCharIntegration:
+    def test_full_pipeline_char_declaration(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("char c = 'a';").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        from parser.statements import CHAR_STATEMENT
+        assert isinstance(program.statements[0], CHAR_STATEMENT)
+
+    def test_full_pipeline_char_and_print(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("char c = 'a';\nprint c;").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 2
+        assert isinstance(program.statements[1], PRINT_STATEMENT)
+
+    def test_full_pipeline_char_escape(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer(r"char c = '\n';").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert stmt.expr.val == ord("\n")
+
+    def test_full_pipeline_char_in_exit(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("exit 'A';").tokenize()
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, EXIT_STATEMENT)
+        assert isinstance(stmt.return_code, CHAR_EXPRESSION)
+        assert stmt.return_code.val == ord("A")

@@ -1,5 +1,5 @@
 from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, DECREMENT_KEYWORD, EQUALS_KEYWORD, GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INCREMENT_KEYWORD, INT64_KEYWORD, INT_DIVISION_KEYWORD, KEYWORDS, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, SEMICOLON
-from tokenizer.literals import INT_LITERAL
+from tokenizer.literals import CHAR_LITERAL, INT_LITERAL
 from tokenizer.tokens import Token, IDENTIFIER
 
 
@@ -52,6 +52,31 @@ class Tokenizer:
 
             elif char in [" ", "\t"]:
                 pass
+
+            elif char == "'":
+                if self._peek() == "\\":
+                    self._consume()
+                    match self._consume():
+                        case "n":
+                            char_value = "\n"
+                        case "t":
+                            char_value = "\t"
+                        case "\\":
+                            char_value = "\\"
+                        case "0":
+                            char_value = "\0"
+                        case "'":
+                            char_value = "'"
+                        case _:
+                            raise ValueError(f"invalid char in line {self._line_num}")
+                else:
+                    char_value = self._consume()
+
+                if self._peek() != "'":
+                    raise ValueError(f"syntax error in line {self._line_num} (expected closing quote for char)")
+
+                self._consume()
+                tokens.append(CHAR_LITERAL(self._line_num, ord(char_value)))
 
             elif char == "/":
                 match self._peek():
