@@ -1,34 +1,30 @@
-# char type demo
-char letter = 'H';
-print letter;
+# TRUE/FALSE boolean constants
+int64 x = 5;
 
-char e = 'e';
-print e;
+if (x > 0 == TRUE) {
+  print 'y';
+}
 
-char l = 'l';
-print l;
-print l;
+if (x > 0 == FALSE) {
+  print 'n';
+}
 
-char o = 'o';
-print o;
+# boolean arithmetic
+int64 sum = TRUE + TRUE + FALSE;
+print sum;
+
+# subtraction without spaces
+int64 a = 10-3-2;
+print a;
+
+# nested bare blocks
+int64 count = 0;
+while (count < 3) {
+  int64 tmp = count;
+  {
+    count = count + 1;
+  }
+}
+print count;
 
 print '\n';
-
-# char with increment
-char c = 'a';
-c++;
-c++;
-print c;
-print '\n';
-
-# char with const
-const char x = 'X';
-print x;
-print '\n';
-
-# mixing char and int64
-int64 code = 42;
-print code;
-print '\n';
-
-exit 0;

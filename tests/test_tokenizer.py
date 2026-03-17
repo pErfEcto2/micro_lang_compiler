@@ -1092,3 +1092,120 @@ class TestTokenizerCharLiteral:
     def test_char_preserves_line_number(self):
         tokens = Tokenizer("\n'a'").tokenize()
         assert tokens[0].line_number == 2
+
+
+class TestTokenizerTrueFalseKeywords:
+    def test_true_keyword(self):
+        from tokenizer.keywords import TRUE_KEYWORD
+        tokens = Tokenizer("TRUE").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], TRUE_KEYWORD)
+
+    def test_false_keyword(self):
+        from tokenizer.keywords import FALSE_KEYWORD
+        tokens = Tokenizer("FALSE").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], FALSE_KEYWORD)
+
+    def test_true_keyword_repr(self):
+        tokens = Tokenizer("TRUE").tokenize()
+        assert repr(tokens[0]) == "TRUE"
+
+    def test_false_keyword_repr(self):
+        tokens = Tokenizer("FALSE").tokenize()
+        assert repr(tokens[0]) == "FALSE"
+
+    def test_true_not_identifier(self):
+        from tokenizer.keywords import TRUE_KEYWORD
+        tokens = Tokenizer("TRUE").tokenize()
+        assert not isinstance(tokens[0], IDENTIFIER)
+        assert isinstance(tokens[0], TRUE_KEYWORD)
+
+    def test_false_not_identifier(self):
+        from tokenizer.keywords import FALSE_KEYWORD
+        tokens = Tokenizer("FALSE").tokenize()
+        assert not isinstance(tokens[0], IDENTIFIER)
+        assert isinstance(tokens[0], FALSE_KEYWORD)
+
+    def test_truevar_is_identifier(self):
+        tokens = Tokenizer("TRUEvar").tokenize()
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert tokens[0].val == "TRUEvar"
+
+    def test_falsevar_is_identifier(self):
+        tokens = Tokenizer("FALSEvar").tokenize()
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert tokens[0].val == "FALSEvar"
+
+    def test_lowercase_true_is_identifier(self):
+        tokens = Tokenizer("true").tokenize()
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert tokens[0].val == "true"
+
+    def test_lowercase_false_is_identifier(self):
+        tokens = Tokenizer("false").tokenize()
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert tokens[0].val == "false"
+
+    def test_true_in_expression(self):
+        from tokenizer.keywords import TRUE_KEYWORD, EQUALS_KEYWORD
+        tokens = Tokenizer("x == TRUE").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert isinstance(tokens[1], EQUALS_KEYWORD)
+        assert isinstance(tokens[2], TRUE_KEYWORD)
+
+    def test_false_in_expression(self):
+        from tokenizer.keywords import FALSE_KEYWORD, EQUALS_KEYWORD
+        tokens = Tokenizer("x == FALSE").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert isinstance(tokens[1], EQUALS_KEYWORD)
+        assert isinstance(tokens[2], FALSE_KEYWORD)
+
+    def test_true_preserves_line_number(self):
+        tokens = Tokenizer("\nTRUE").tokenize()
+        assert tokens[0].line_number == 2
+
+    def test_false_preserves_line_number(self):
+        tokens = Tokenizer("\nFALSE").tokenize()
+        assert tokens[0].line_number == 2
+
+
+class TestTokenizerSubtractionWithoutSpaces:
+    def test_subtraction_no_spaces(self):
+        from tokenizer.keywords import MINUS_KEYWORD
+        tokens = Tokenizer("3-2").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], INT_LITERAL)
+        assert tokens[0].val == 3
+        assert isinstance(tokens[1], MINUS_KEYWORD)
+        assert isinstance(tokens[2], INT_LITERAL)
+        assert tokens[2].val == 2
+
+    def test_identifier_minus_digit_no_spaces(self):
+        from tokenizer.keywords import MINUS_KEYWORD
+        tokens = Tokenizer("x-1").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert tokens[0].val == "x"
+        assert isinstance(tokens[1], MINUS_KEYWORD)
+        assert isinstance(tokens[2], INT_LITERAL)
+        assert tokens[2].val == 1
+
+    def test_identifier_minus_large_number(self):
+        from tokenizer.keywords import MINUS_KEYWORD
+        tokens = Tokenizer("x-100").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert isinstance(tokens[1], MINUS_KEYWORD)
+        assert isinstance(tokens[2], INT_LITERAL)
+        assert tokens[2].val == 100
+
+    def test_negative_in_expression_unary(self):
+        from tokenizer.keywords import MINUS_KEYWORD
+        tokens = Tokenizer("-5").tokenize()
+        assert len(tokens) == 2
+        assert isinstance(tokens[0], MINUS_KEYWORD)
+        assert isinstance(tokens[1], INT_LITERAL)
+        assert tokens[1].val == 5

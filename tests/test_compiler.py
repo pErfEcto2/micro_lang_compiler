@@ -37,12 +37,13 @@ class TestCompilerPrefix:
     def test_prefix_order(self):
         result = Compiler(_make_program()).compile()
         lines = result.split("\n")
-        assert lines[0] == "section .data"
-        assert lines[1] == "section .text"
-        assert lines[2] == "global main"
-        assert lines[3] == "main:"
-        assert lines[4] == "    push rbp"
-        assert lines[5] == "    mov rbp, rsp"
+        assert lines[0] == "extern fflush"
+        assert lines[1] == "section .data"
+        assert lines[2] == "section .text"
+        assert lines[3] == "global main"
+        assert lines[4] == "main:"
+        assert lines[5] == "    push rbp"
+        assert lines[6] == "    mov rbp, rsp"
 
 
 class TestCompilerSuffix:
@@ -117,12 +118,15 @@ class TestCompilerFullOutput:
     def test_empty_program(self):
         result = Compiler(_make_program()).compile()
         expected = "\n".join([
+            "extern fflush",
             "section .data",
             "section .text",
             "global main",
             "main:",
             "    push rbp",
             "    mov rbp, rsp",
+            "    mov rdi, 0",
+            "    call fflush",
             "    mov rax, 60",
             "    mov rdi, 0",
             "    syscall",
@@ -133,6 +137,7 @@ class TestCompilerFullOutput:
         prog = _make_program(EXIT_STATEMENT(1, INT_EXPRESSION(1, 42)))
         result = Compiler(prog).compile()
         expected = "\n".join([
+            "extern fflush",
             "section .data",
             "section .text",
             "global main",
@@ -143,6 +148,8 @@ class TestCompilerFullOutput:
             "    pop rdi",
             "    mov rax, 60",
             "    syscall",
+            "    mov rdi, 0",
+            "    call fflush",
             "    mov rax, 60",
             "    mov rdi, 0",
             "    syscall",
@@ -570,10 +577,10 @@ class TestCompilerPrintStatement:
         assert "    pop rsi" in result
         assert "    call printf" in result
 
-    def test_no_extern_without_print(self):
+    def test_no_printf_extern_without_print(self):
         prog = _make_program(EXIT_STATEMENT(1, INT_EXPRESSION(1, 0)))
         result = Compiler(prog).compile()
-        assert "extern" not in result
+        assert "extern printf" not in result
 
 
 class TestCompilerAssignStatement:
@@ -1518,4 +1525,81 @@ class TestCompilerCharIntegration:
         prog = Parser(tokens).parse()
         result = Compiler(prog).compile()
         assert "    mov byte [rbp - 8], al" in result
+
+
+class TestCompilerTrueFalse:
+    def test_true_compiles_to_push_1(self):
+        prog = _make_program(EXIT_STATEMENT(1, INT_EXPRESSION(1, 1)))
+        result = Compiler(prog).compile()
+        assert "    push 1" in result
+
+    def test_false_compiles_to_push_0(self):
+        prog = _make_program(EXIT_STATEMENT(1, INT_EXPRESSION(1, 0)))
+        result = Compiler(prog).compile()
+        assert "    push 0" in result
+
+    def test_full_pipeline_exit_true(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("exit TRUE;").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    push 1" in result
+        assert "    pop rdi" in result
+
+    def test_full_pipeline_exit_false(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("exit FALSE;").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    push 0" in result
+        assert "    pop rdi" in result
+
+    def test_full_pipeline_if_true(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("if (TRUE) { print 1; }").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    push 1" in result
+        assert "    cmp rax, 0" in result
+
+
+class TestCompilerFflush:
+    def test_suffix_calls_fflush(self):
+        result = Compiler(_make_program()).compile()
+        assert "extern fflush" in result
+        assert "    call fflush" in result
+
+    def test_fflush_before_exit_syscall(self):
+        result = Compiler(_make_program()).compile()
+        lines = result.split("\n")
+        fflush_idx = None
+        syscall_idx = None
+        for i, line in enumerate(lines):
+            if "call fflush" in line and fflush_idx is None:
+                fflush_idx = i
+            if "syscall" in line and fflush_idx is not None:
+                syscall_idx = i
+                break
+        assert fflush_idx is not None
+        assert syscall_idx is not None
+        assert fflush_idx < syscall_idx
+
+
+class TestCompilerNestedBareBlocks:
+    def test_full_pipeline_nested_block_in_while(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        src = "int64 x = 3;\nwhile (x > 0) {\n  int64 y = 1;\n  { x = x - 1; }\n}\nexit 0;"
+        tokens = Tokenizer(src).tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        # The inner scope should be cleaned up (add rsp) inside the loop body
+        assert "    add rsp, 8" in result
 

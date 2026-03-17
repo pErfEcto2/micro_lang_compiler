@@ -108,6 +108,22 @@ class PRINT_KEYWORD(KEYWORD):
     def __str__(self) -> str:
         return "print"
 
+@register_keyword("TRUE")
+class TRUE_KEYWORD(KEYWORD):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+
+    def __str__(self) -> str:
+        return "TRUE"
+
+@register_keyword("FALSE")
+class FALSE_KEYWORD(KEYWORD):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+
+    def __str__(self) -> str:
+        return "FALSE"
+
 @register_keyword("if")
 class IF_KEYWORD(KEYWORD):
     def __init__(self, line_num: int) -> None:

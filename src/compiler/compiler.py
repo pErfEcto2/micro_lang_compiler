@@ -127,6 +127,9 @@ class Compiler:
         self._text_s.append("    syscall")
 
     def _gen_suffix(self) -> None:
+        self._externs.add("fflush")
+        self._mov("rdi", "0")
+        self._call("fflush")
         self._mov("rax", "60")
         self._mov("rdi", "0")
         self._syscall()

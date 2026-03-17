@@ -1761,3 +1761,271 @@ class TestParserCharIntegration:
         assert isinstance(stmt, EXIT_STATEMENT)
         assert isinstance(stmt.return_code, CHAR_EXPRESSION)
         assert stmt.return_code.val == ord("A")
+
+
+class TestParserTrueFalse:
+    def test_true_as_expression(self):
+        from tokenizer.keywords import TRUE_KEYWORD
+        tokens = [EXIT_KEYWORD(1), TRUE_KEYWORD(1), SEMICOLON(1)]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, EXIT_STATEMENT)
+        assert isinstance(stmt.return_code, INT_EXPRESSION)
+        assert stmt.return_code.val == 1
+
+    def test_false_as_expression(self):
+        from tokenizer.keywords import FALSE_KEYWORD
+        tokens = [EXIT_KEYWORD(1), FALSE_KEYWORD(1), SEMICOLON(1)]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, EXIT_STATEMENT)
+        assert isinstance(stmt.return_code, INT_EXPRESSION)
+        assert stmt.return_code.val == 0
+
+    def test_true_in_binary_expression(self):
+        from tokenizer.keywords import TRUE_KEYWORD
+        tokens = [
+            EXIT_KEYWORD(1),
+            IDENTIFIER(1, "x"), EQUALS_KEYWORD(1), TRUE_KEYWORD(1),
+            SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt.return_code, BINARY_EXPRESSION)
+        assert isinstance(stmt.return_code.rval, INT_EXPRESSION)
+        assert stmt.return_code.rval.val == 1
+
+    def test_false_in_binary_expression(self):
+        from tokenizer.keywords import FALSE_KEYWORD
+        tokens = [
+            EXIT_KEYWORD(1),
+            IDENTIFIER(1, "x"), EQUALS_KEYWORD(1), FALSE_KEYWORD(1),
+            SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt.return_code, BINARY_EXPRESSION)
+        assert isinstance(stmt.return_code.rval, INT_EXPRESSION)
+        assert stmt.return_code.rval.val == 0
+
+    def test_true_in_if_condition(self):
+        from tokenizer.keywords import TRUE_KEYWORD
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), TRUE_KEYWORD(1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, IF_STATEMENT)
+        assert isinstance(stmt.expr, INT_EXPRESSION)
+        assert stmt.expr.val == 1
+
+    def test_false_in_while_condition(self):
+        from tokenizer.keywords import FALSE_KEYWORD
+        tokens = [
+            WHILE_KEYWORD(1), OPEN_BRACKET(1), FALSE_KEYWORD(1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, WHILE_STATEMENT)
+        assert isinstance(stmt.expr, INT_EXPRESSION)
+        assert stmt.expr.val == 0
+
+    def test_true_preserves_line_number(self):
+        from tokenizer.keywords import TRUE_KEYWORD
+        tokens = [EXIT_KEYWORD(5), TRUE_KEYWORD(5), SEMICOLON(5)]
+        program = Parser(tokens).parse()
+        assert program.statements[0].return_code.line_number == 5
+
+    def test_true_with_arithmetic(self):
+        from tokenizer.keywords import TRUE_KEYWORD
+        tokens = [
+            EXIT_KEYWORD(1),
+            TRUE_KEYWORD(1), PLUS_KEYWORD(1), INT_LITERAL(1, 2),
+            SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt.return_code, BINARY_EXPRESSION)
+        assert isinstance(stmt.return_code.lval, INT_EXPRESSION)
+        assert stmt.return_code.lval.val == 1
+
+
+class TestParserTrueFalseIntegration:
+    def test_full_pipeline_true(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("exit TRUE;").tokenize()
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, EXIT_STATEMENT)
+        assert isinstance(stmt.return_code, INT_EXPRESSION)
+        assert stmt.return_code.val == 1
+
+    def test_full_pipeline_false(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("exit FALSE;").tokenize()
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, EXIT_STATEMENT)
+        assert isinstance(stmt.return_code, INT_EXPRESSION)
+        assert stmt.return_code.val == 0
+
+    def test_full_pipeline_true_in_if(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("if (TRUE) { print 1; }").tokenize()
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, IF_STATEMENT)
+        assert isinstance(stmt.expr, INT_EXPRESSION)
+        assert stmt.expr.val == 1
+
+    def test_full_pipeline_comparison_with_true(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("exit x == TRUE;").tokenize()
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt.return_code, BINARY_EXPRESSION)
+
+    def test_full_pipeline_true_plus_false(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("exit TRUE + FALSE;").tokenize()
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt.return_code, BINARY_EXPRESSION)
+        assert stmt.return_code.lval.val == 1
+        assert stmt.return_code.rval.val == 0
+
+
+class TestParserNestedBareBlocks:
+    def test_bare_block_inside_while(self):
+        tokens = [
+            WHILE_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1),
+            OPEN_C_BRACKET(2), PRINT_KEYWORD(3), INT_LITERAL(3, 1), SEMICOLON(3),
+            CLOSE_C_BRACKET(4),
+            CLOSE_C_BRACKET(5),
+        ]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, WHILE_STATEMENT)
+        # body: OPEN_C, OPEN_C, PRINT, CLOSE_C, CLOSE_C
+        assert len(stmt.body) == 5
+        assert isinstance(stmt.body[0], OPEN_C_STATEMENT)
+        assert isinstance(stmt.body[1], OPEN_C_STATEMENT)
+        assert isinstance(stmt.body[2], PRINT_STATEMENT)
+        assert isinstance(stmt.body[3], CLOSE_C_STATEMENT)
+        assert isinstance(stmt.body[4], CLOSE_C_STATEMENT)
+
+    def test_bare_block_inside_if(self):
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1),
+            OPEN_C_BRACKET(2), PRINT_KEYWORD(3), INT_LITERAL(3, 42), SEMICOLON(3),
+            CLOSE_C_BRACKET(4),
+            CLOSE_C_BRACKET(5),
+        ]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, IF_STATEMENT)
+        assert len(stmt.true_body) == 5
+        assert isinstance(stmt.true_body[1], OPEN_C_STATEMENT)
+        assert isinstance(stmt.true_body[3], CLOSE_C_STATEMENT)
+
+    def test_bare_block_inside_for(self):
+        tokens = [
+            FOR_KEYWORD(1), OPEN_BRACKET(1), SEMICOLON(1), SEMICOLON(1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1),
+            OPEN_C_BRACKET(2), CLOSE_C_BRACKET(3),
+            CLOSE_C_BRACKET(4),
+        ]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, FOR_STATEMENT)
+        # body: OPEN_C, OPEN_C, CLOSE_C, CLOSE_C
+        assert len(stmt.body) == 4
+
+    def test_bare_block_with_var_inside_while(self):
+        tokens = [
+            WHILE_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 1), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1),
+            INT64_KEYWORD(2), IDENTIFIER(2, "y"), ASSIGN_KEYWORD(2), INT_LITERAL(2, 1), SEMICOLON(2),
+            OPEN_C_BRACKET(3),
+            IDENTIFIER(4, "x"), ASSIGN_KEYWORD(4), INT_LITERAL(4, 0), SEMICOLON(4),
+            CLOSE_C_BRACKET(5),
+            CLOSE_C_BRACKET(6),
+        ]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, WHILE_STATEMENT)
+        var_stmts = [s for s in stmt.body if isinstance(s, INT64_STATEMENT)]
+        assert len(var_stmts) == 1
+        open_stmts = [s for s in stmt.body if isinstance(s, OPEN_C_STATEMENT)]
+        assert len(open_stmts) == 2
+        close_stmts = [s for s in stmt.body if isinstance(s, CLOSE_C_STATEMENT)]
+        assert len(close_stmts) == 2
+
+    def test_bare_block_no_stray_statement_at_top_level(self):
+        """Nested bare blocks should not leave stray CLOSE_C at program level"""
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("while (1) { { print 1; } }").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        assert isinstance(program.statements[0], WHILE_STATEMENT)
+
+    def test_bare_block_in_else(self):
+        tokens = [
+            IF_KEYWORD(1), OPEN_BRACKET(1), INT_LITERAL(1, 0), CLOSE_BRACKET(1),
+            OPEN_C_BRACKET(1), CLOSE_C_BRACKET(1),
+            ELSE_KEYWORD(2), OPEN_C_BRACKET(2),
+            OPEN_C_BRACKET(3), PRINT_KEYWORD(4), INT_LITERAL(4, 1), SEMICOLON(4),
+            CLOSE_C_BRACKET(5),
+            CLOSE_C_BRACKET(6),
+        ]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, IF_STATEMENT)
+        assert stmt.false_body is not None
+        assert len(stmt.false_body) == 5
+
+
+class TestParserNestedBareBlocksIntegration:
+    def test_full_pipeline_nested_block_in_while(self):
+        from tokenizer.tokenizer import Tokenizer
+        src = "while (1) { { print 1; } }"
+        tokens = Tokenizer(src).tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        assert isinstance(program.statements[0], WHILE_STATEMENT)
+        assert len(program.statements[0].body) == 5
+
+    def test_full_pipeline_nested_block_in_if(self):
+        from tokenizer.tokenizer import Tokenizer
+        src = "if (1) { { print 1; } }"
+        tokens = Tokenizer(src).tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        assert isinstance(program.statements[0], IF_STATEMENT)
+        assert len(program.statements[0].true_body) == 5
+
+    def test_full_pipeline_nested_block_in_for(self):
+        from tokenizer.tokenizer import Tokenizer
+        src = "for (;;) { { print 1; } }"
+        tokens = Tokenizer(src).tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        assert isinstance(program.statements[0], FOR_STATEMENT)
+
+    def test_full_pipeline_bare_block_with_var_in_while(self):
+        from tokenizer.tokenizer import Tokenizer
+        src = "int64 x = 3;\nwhile (x > 0) {\n  int64 y = 1;\n  { x = x - 1; }\n}"
+        tokens = Tokenizer(src).tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 2
+        assert isinstance(program.statements[0], INT64_STATEMENT)
+        assert isinstance(program.statements[1], WHILE_STATEMENT)

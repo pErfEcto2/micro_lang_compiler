@@ -949,3 +949,152 @@ class TestRuntimeChar:
         src = "char c = 'b';\nc--;\nexit c;"
         result = run_executable(src)
         assert result.returncode == ord("a")
+
+
+class TestMainTrueFalse:
+    def test_true_creates_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("exit TRUE;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "push 1" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_false_creates_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("exit FALSE;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "push 0" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_verbose_true_shows_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("if (TRUE) { exit 1; }")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-v", "-o", out_path, src_path)
+                assert "push 1" in result.stdout
+                assert "cmp rax, 0" in result.stdout
+        finally:
+            os.unlink(src_path)
+
+
+class TestRuntimeTrueFalse:
+    def test_exit_true(self):
+        result = run_executable("exit TRUE;")
+        assert result.returncode == 1
+
+    def test_exit_false(self):
+        result = run_executable("exit FALSE;")
+        assert result.returncode == 0
+
+    def test_if_true_takes_branch(self):
+        result = run_executable("if (TRUE) { exit 42; }\nexit 0;")
+        assert result.returncode == 42
+
+    def test_if_false_skips_branch(self):
+        result = run_executable("if (FALSE) { exit 42; }\nexit 0;")
+        assert result.returncode == 0
+
+    def test_true_equals_comparison_result(self):
+        """1 > 0 == TRUE should be 1 (comparison returns 1, which equals TRUE)"""
+        result = run_executable("int64 x = 1;\nif (x > 0 == TRUE) { exit 10; }\nexit 0;")
+        assert result.returncode == 10
+
+    def test_false_equals_comparison_result(self):
+        """1 > 0 == FALSE should be 0 (comparison returns 1, which != FALSE)"""
+        result = run_executable("int64 x = 1;\nif (x > 0 == FALSE) { exit 10; }\nexit 0;")
+        assert result.returncode == 0
+
+    def test_true_in_while_condition(self):
+        """while (TRUE) runs at least once"""
+        result = run_executable("int64 x = 0;\nwhile (x == FALSE) {\n  x = 1;\n}\nexit x;")
+        assert result.returncode == 1
+
+    def test_true_plus_true(self):
+        result = run_executable("exit TRUE + TRUE;")
+        assert result.returncode == 2
+
+    def test_true_times_false(self):
+        result = run_executable("exit TRUE * FALSE;")
+        assert result.returncode == 0
+
+
+class TestRuntimeSubtractionNoSpaces:
+    def test_subtraction_no_spaces(self):
+        """3-2 should parse as 3 - 2 = 1"""
+        result = run_executable("exit 3-2;")
+        assert result.returncode == 1
+
+    def test_identifier_minus_literal_no_spaces(self):
+        """x-1 should parse as x - 1"""
+        result = run_executable("int64 x = 10;\nexit x-1;")
+        assert result.returncode == 9
+
+    def test_chained_subtraction_no_spaces(self):
+        """10-3-2 should be (10-3)-2 = 5"""
+        result = run_executable("exit 10-3-2;")
+        assert result.returncode == 5
+
+    def test_negative_unary_still_works(self):
+        """Unary minus should still work: int64 x = -5"""
+        result = run_executable("int64 x = -5;\nexit x + 10;")
+        assert result.returncode == 5
+
+
+class TestRuntimeNestedBareBlocks:
+    def test_nested_block_in_while_no_stack_leak(self):
+        """While loop with nested bare blocks should not leak stack"""
+        src = "int64 x = 3;\nwhile (x > 0) {\n  int64 y = 1;\n  { x = x - 1; }\n}\nexit x;"
+        result = run_executable(src)
+        assert result.returncode == 0
+
+    def test_nested_block_in_while_large_loop(self):
+        """Large loop with nested bare blocks should not segfault"""
+        src = "int64 x = 0;\nwhile (x < 100000) {\n  int64 y = x;\n  { x = x + 1; }\n}\nexit 42;"
+        result = run_executable(src)
+        assert result.returncode == 42
+
+    def test_nested_block_in_if(self):
+        src = "if (1) {\n  { exit 10; }\n}\nexit 0;"
+        result = run_executable(src)
+        assert result.returncode == 10
+
+    def test_nested_block_in_for(self):
+        src = "int64 sum = 0;\nfor (int64 i = 0; i < 5; i++) {\n  { sum = sum + i; }\n}\nexit sum;"
+        result = run_executable(src)
+        assert result.returncode == 10
+
+
+class TestRuntimeFflush:
+    def test_print_output_visible(self):
+        """Print output should be visible (fflush in suffix)"""
+        result = run_executable("print 42;")
+        assert result.returncode == 0
+        assert "42" in result.stdout
+
+    def test_print_char_output_visible(self):
+        """Char print output should be visible"""
+        result = run_executable("print 'A';")
+        assert result.returncode == 0
+        assert "A" in result.stdout

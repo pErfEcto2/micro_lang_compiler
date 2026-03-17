@@ -16,6 +16,7 @@ A compiler for a minimal programming language that compiles to x86 assembly (NAS
 - `if/else` — conditional branching
 - `while` — loops
 - `for` — loops with init/condition/increment
+- `TRUE`, `FALSE` — boolean constants (`1` and `0`)
 - Comparison: `>`, `<`, `>=`, `<=`, `==`, `!=`
 - Comments: `# single-line`, `/* multi-line */`
 
@@ -50,6 +51,11 @@ if (x == y) {
   print 1;
 } else {
   print 0;
+}
+
+# boolean constants
+if (x > 0 == TRUE) {
+  print 1;
 }
 
 {

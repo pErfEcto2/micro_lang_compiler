@@ -52,11 +52,11 @@
 | `}` | End of a scope / block |
 | `# ...` | Single-line comment |
 | `/* ... */` | Multi-line comment |
-| `-` | Negative sign |
+| `-` | Unary negation |
 | `&` | Reference-of *(not implemented)* |
 | `*` | Dereference *(not implemented)* |
 | `NULL` | NULL pointer *(not implemented)* |
-| `TRUE` | TRUE constant *(not implemented)* |
-| `FALSE` | FALSE constant *(not implemented)* |
+| `TRUE` | Boolean true (evaluates to `1`) |
+| `FALSE` | Boolean false (evaluates to `0`) |
 | `[ ]` | Arrays *(not implemented)* |
 

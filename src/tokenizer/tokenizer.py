@@ -156,11 +156,7 @@ class Tokenizer:
                     tokens.append(DECREMENT_KEYWORD(self._line_num))
                     continue
 
-                next_char = self._peek()
-                if next_char is not None and next_char.isdigit():
-                    tokens.append(INT_LITERAL(self._line_num, -1 * self._assemble_int(self._consume())))
-                else:
-                    tokens.append(MINUS_KEYWORD(self._line_num))
+                tokens.append(MINUS_KEYWORD(self._line_num))
 
             elif char == "*":
                 tokens.append(MULTIPLY_KEYWORD(self._line_num))

@@ -1,7 +1,7 @@
 from parser.statements import ASSIGN_STATEMENT, CHAR_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, FOR_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT, WHILE_STATEMENT
 from parser.program import PROGRAM
 from parser.expressions import BINARY_EXPRESSION, CHAR_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION
-from tokenizer.keywords import ASSIGN_KEYWORD, CHAR_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, ELSE_KEYWORD, EXIT_KEYWORD, FOR_KEYWORD, IF_KEYWORD, INT64_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MULTIPLY_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PRINT_KEYWORD, SEMICOLON, UNARY_MATH_OPERATION, WHILE_KEYWORD
+from tokenizer.keywords import ASSIGN_KEYWORD, CHAR_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, ELSE_KEYWORD, EXIT_KEYWORD, FALSE_KEYWORD, FOR_KEYWORD, IF_KEYWORD, INT64_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MULTIPLY_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PRINT_KEYWORD, SEMICOLON, TRUE_KEYWORD, UNARY_MATH_OPERATION, WHILE_KEYWORD
 from tokenizer.literals import CHAR_LITERAL, INT_LITERAL
 from tokenizer.tokens import IDENTIFIER, Token
 
@@ -77,9 +77,35 @@ class Parser:
             case CHAR_LITERAL():
                 left = CHAR_EXPRESSION(ln, token.val)
                 return self._get_expr(left, min_bp, ln)
-                
+
+            case TRUE_KEYWORD():
+                left = INT_EXPRESSION(ln, 1)
+                return self._get_expr(left, min_bp, ln)
+
+            case FALSE_KEYWORD():
+                left = INT_EXPRESSION(ln, 0)
+                return self._get_expr(left, min_bp, ln)
+
             case _:
                 raise ValueError(f"unexpected expression '{token}' in line {ln}")
+
+    def _parse_body(self) -> list[STATEMENT]:
+        self._assert_current_token_type(OPEN_C_BRACKET)                                                                                                                        
+        body = [self._create_statement(self._consume())]                                                                                                                       
+        c_bracket_cnt = 0                                                                                                                                                      
+        while self._peek() is not None:                                                                                                                                        
+            if isinstance(self._peek(), CLOSE_C_BRACKET) and c_bracket_cnt == 0:                                                                                               
+                break                                                                                                                                                          
+            statement = self._create_statement(self._consume())                                                                                                                
+            if statement is not None:                                                                                                                                          
+                if isinstance(statement, OPEN_C_STATEMENT):                                                                                                                    
+                    c_bracket_cnt += 1                                                                                                                                         
+                elif isinstance(statement, CLOSE_C_STATEMENT):                                                                                                                 
+                    c_bracket_cnt -= 1                                                                                                                                         
+                body.append(statement)                                                                                                                                         
+        self._assert_current_token_type(CLOSE_C_BRACKET)                                                                                                                       
+        body.append(self._create_statement(self._consume()))                                                                                                                   
+        return body       
 
     def _parse_exit_statement(self) -> EXIT_STATEMENT:
         expr = self._parse_expr(self._consume())
@@ -136,15 +162,7 @@ class Parser:
         self._assert_current_token_type(CLOSE_BRACKET)
         self._consume()
         
-        self._assert_current_token_type(OPEN_C_BRACKET)
-
-        body = []
-        while self._peek() is not None and type(self._peek()) != CLOSE_C_BRACKET:
-            if (statement := self._create_statement(self._consume())) is not None:
-                body.append(statement)
-
-        self._assert_current_token_type(CLOSE_C_BRACKET)
-        body.append(self._create_statement(self._consume()))
+        body = self._parse_body()
 
         return WHILE_STATEMENT(ln, expr, body)
 
@@ -193,14 +211,7 @@ class Parser:
         self._assert_current_token_type(CLOSE_BRACKET)
         self._consume()
 
-        self._assert_current_token_type(OPEN_C_BRACKET)
-        body = []
-        while self._peek() is not None and type(self._peek()) != CLOSE_C_BRACKET:
-            if (statement := self._create_statement(self._consume())) is not None:
-                body.append(statement)
-
-        self._assert_current_token_type(CLOSE_C_BRACKET)
-        body.append(self._create_statement(self._consume()))
+        body = self._parse_body()
 
         return FOR_STATEMENT(ln, body, init, cond, inc)
 
@@ -261,26 +272,12 @@ class Parser:
         self._assert_current_token_type(CLOSE_BRACKET)
         self._consume()
 
-        self._assert_current_token_type(OPEN_C_BRACKET)
-
-        true_body = []
-        while self._peek() is not None and type(self._peek()) != CLOSE_C_BRACKET:
-            if (statement := self._create_statement(self._consume())) is not None:
-                true_body.append(statement)
-
-        self._assert_current_token_type(CLOSE_C_BRACKET)
-        true_body.append(self._create_statement(self._consume()))
+        true_body = self._parse_body()
 
         false_body = None
-        if type(self._peek()) == ELSE_KEYWORD:
+        if isinstance(self._peek(), ELSE_KEYWORD):
             self._consume()
-            self._assert_current_token_type(OPEN_C_BRACKET)
-            false_body = []
-            while self._peek() is not None and type(self._peek()) != CLOSE_C_BRACKET:
-                if (statement := self._create_statement(self._consume())) is not None:
-                    false_body.append(statement)
-            self._assert_current_token_type(CLOSE_C_BRACKET)
-            false_body.append(self._create_statement(self._consume()))
+            false_body = self._parse_body()
 
         return IF_STATEMENT(ln, expr, true_body, false_body)
 

@@ -137,6 +137,48 @@ print x;
 print x + 1;
 ```
 
+### Boolean Constants
+
+Use `TRUE` and `FALSE` as boolean constants. `TRUE` evaluates to `1` and `FALSE` evaluates to `0`:
+
+```
+if (TRUE) {
+  print 1;
+}
+```
+
+Output: `1`.
+
+They can be used in comparisons:
+
+```
+int64 x = 5;
+if (x > 0 == TRUE) {
+  print 1;
+}
+```
+
+Output: `1` (because `x > 0` returns `1`, and `1 == TRUE` is true).
+
+Note that `TRUE` is exactly `1`, not "any nonzero value". So `x == TRUE` is only true when `x` is `1`:
+
+```
+int64 x = 5;
+if (x == TRUE) {
+  print 1;
+}
+```
+
+This prints nothing because `5 != 1`.
+
+`TRUE` and `FALSE` can be used anywhere an expression is expected:
+
+```
+exit TRUE + TRUE;
+```
+
+Exit code: `2`.
+
 ### Scopes
 
 Use curly brackets `{ }` to create a new scope. Variables declared inside a scope are local to it and cleaned up when the scope ends. Inner scopes can access variables from outer scopes, and can shadow them with new declarations:
