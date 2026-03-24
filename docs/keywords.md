@@ -11,7 +11,7 @@
 | `print` | Print int64 to the console |
 | `if/else` | Conditional branching |
 | `while` | Loop |
-| `do/while` | Loop *(not implemented)* |
+| `do/while` | Loop (executes body at least once) |
 | `for` | Loop |
 | `=` | Assign |
 | `const` | Make a variable constant |

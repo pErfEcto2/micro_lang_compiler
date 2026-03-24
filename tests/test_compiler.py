@@ -1591,6 +1591,54 @@ class TestCompilerFflush:
         assert fflush_idx < syscall_idx
 
 
+class TestCompilerDoWhileStatement:
+    def test_do_while_generates_labels(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        src = "int64 x = 0;\ndo {\n  x = x + 1;\n} while (x < 3);"
+        tokens = Tokenizer(src).tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert ".do_while_start_0:" in result
+
+    def test_do_while_uses_jne(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        src = "int64 x = 0;\ndo {\n  x = x + 1;\n} while (x < 3);"
+        tokens = Tokenizer(src).tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "jne .do_while_start_0" in result
+
+    def test_do_while_body_has_scope_cleanup(self):
+        """do/while loop body with variable should clean up stack space"""
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        src = "int64 x = 0;\ndo {\n  int64 y = 1;\n  x = x + 1;\n} while (x < 3);"
+        tokens = Tokenizer(src).tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        body_start = result.index(".do_while_start_0:")
+        body = result[body_start:]
+        assert "sub rsp, 8" in body
+        assert "add rsp, 8" in body
+
+    def test_do_while_with_var_after_loop(self):
+        """Variables declared after a do/while loop should work correctly"""
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        src = "int64 x = 0;\ndo {\n  int64 y = 1;\n  x = x + 1;\n} while (x < 2);\nint64 z = 99;\nexit z;"
+        tokens = Tokenizer(src).tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert ".do_while_start_0:" in result
+        assert "push 99" in result
+
+
 class TestCompilerNestedBareBlocks:
     def test_full_pipeline_nested_block_in_while(self):
         from tokenizer.tokenizer import Tokenizer

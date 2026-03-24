@@ -15,6 +15,7 @@ A compiler for a minimal programming language that compiles to x86 assembly (NAS
 - Arithmetic expressions: `+`, `-`, `*`, `//`, `%`
 - `if/else` — conditional branching
 - `while` — loops
+- `do/while` — loops (body executes at least once)
 - `for` — loops with init/condition/increment
 - `TRUE`, `FALSE` — boolean constants (`1` and `0`)
 - Comparison: `>`, `<`, `>=`, `<=`, `==`, `!=`
@@ -76,6 +77,12 @@ while (i != 5) {
 for (int64 j = 0; j < 3; j++) {
   print j;
 }
+
+# do/while — runs at least once
+int64 n = 0;
+do {
+  n++;
+} while (n < 3);
 
 # characters
 char c = 'A';

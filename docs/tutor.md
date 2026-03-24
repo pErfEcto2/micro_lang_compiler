@@ -311,6 +311,55 @@ while (i < 3) {
 
 Output: `0`, `10`, `20`.
 
+### Do / While
+
+Use `do/while` for loops that always execute the body at least once. The condition is checked after each iteration. The statement must end with a semicolon:
+
+```
+int64 i = 0;
+do {
+  print i;
+  i++;
+} while (i < 5);
+```
+
+Output: `0`, `1`, `2`, `3`, `4`.
+
+Unlike `while`, the body runs at least once even if the condition is immediately false:
+
+```
+int64 x = 100;
+do {
+  print x;
+} while (0);
+```
+
+Output: `100`.
+
+The condition can use postfix expressions:
+
+```
+int64 i = 0;
+do {
+  print i;
+} while (i++ < 2);
+```
+
+Output: `0`, `1`, `2`.
+
+Variables declared inside a `do/while` body are scoped to the loop body:
+
+```
+int64 i = 0;
+do {
+  int64 x = i * 10;
+  print x;
+  i = i + 1;
+} while (i < 3);
+```
+
+Output: `0`, `10`, `20`.
+
 ### For
 
 Use `for` for loops with an initialization, condition, and increment clause. All three clauses are optional:

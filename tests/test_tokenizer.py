@@ -1209,3 +1209,52 @@ class TestTokenizerSubtractionWithoutSpaces:
         assert isinstance(tokens[0], MINUS_KEYWORD)
         assert isinstance(tokens[1], INT_LITERAL)
         assert tokens[1].val == 5
+
+
+class TestTokenizerDoKeyword:
+    def test_do_keyword(self):
+        from tokenizer.keywords import DO_KEYWORD
+        tokens = Tokenizer("do").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], DO_KEYWORD)
+
+    def test_do_keyword_repr(self):
+        tokens = Tokenizer("do").tokenize()
+        assert repr(tokens[0]) == "do"
+
+    def test_do_not_identifier(self):
+        from tokenizer.keywords import DO_KEYWORD
+        tokens = Tokenizer("do").tokenize()
+        assert not isinstance(tokens[0], IDENTIFIER)
+        assert isinstance(tokens[0], DO_KEYWORD)
+
+    def test_dovar_is_identifier(self):
+        tokens = Tokenizer("dovar").tokenize()
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert tokens[0].val == "dovar"
+
+    def test_do_with_no_space_before_brace(self):
+        from tokenizer.keywords import DO_KEYWORD, OPEN_C_BRACKET
+        tokens = Tokenizer("do{}").tokenize()
+        assert isinstance(tokens[0], DO_KEYWORD)
+        assert isinstance(tokens[1], OPEN_C_BRACKET)
+
+    def test_do_while_statement_tokens(self):
+        from tokenizer.keywords import DO_KEYWORD, WHILE_KEYWORD, OPEN_BRACKET, CLOSE_BRACKET, OPEN_C_BRACKET, CLOSE_C_BRACKET, PRINT_KEYWORD, LESS_KEYWORD
+        tokens = Tokenizer("do { print i; } while (i < 5);").tokenize()
+        assert isinstance(tokens[0], DO_KEYWORD)
+        assert isinstance(tokens[1], OPEN_C_BRACKET)
+        assert isinstance(tokens[2], PRINT_KEYWORD)
+        assert isinstance(tokens[3], IDENTIFIER)
+        assert tokens[3].val == "i"
+        assert isinstance(tokens[4], SEMICOLON)
+        assert isinstance(tokens[5], CLOSE_C_BRACKET)
+        assert isinstance(tokens[6], WHILE_KEYWORD)
+        assert isinstance(tokens[7], OPEN_BRACKET)
+        assert isinstance(tokens[8], IDENTIFIER)
+        assert tokens[8].val == "i"
+        assert isinstance(tokens[9], LESS_KEYWORD)
+        assert isinstance(tokens[10], INT_LITERAL)
+        assert tokens[10].val == 5
+        assert isinstance(tokens[11], CLOSE_BRACKET)
+        assert isinstance(tokens[12], SEMICOLON)

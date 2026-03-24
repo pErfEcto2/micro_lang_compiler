@@ -1086,6 +1086,98 @@ class TestRuntimeNestedBareBlocks:
         assert result.returncode == 10
 
 
+class TestMainDoWhileStatement:
+    def test_do_while_creates_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("int64 x = 0;\ndo {\n  x = x + 1;\n} while (x < 3);\nexit x;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert ".do_while_start_0:" in content
+                assert "jne .do_while_start_0" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_do_while_empty_body(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("do {} while (0);")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+        finally:
+            os.unlink(src_path)
+
+    def test_do_while_with_print(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("int64 x = 0;\ndo {\n  print x;\n  x = x + 1;\n} while (x < 3);")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+        finally:
+            os.unlink(src_path)
+
+
+class TestRuntimeDoWhile:
+    def test_do_while_executes_body_once(self):
+        """do/while always executes body at least once, even when condition is false"""
+        result = run_executable("int64 x = 0;\ndo {\n  x = x + 1;\n} while (0);\nexit x;")
+        assert result.returncode == 1
+
+    def test_do_while_loops_correctly(self):
+        """do/while loops until condition becomes false"""
+        result = run_executable("int64 x = 0;\ndo {\n  x = x + 1;\n} while (x < 5);\nexit x;")
+        assert result.returncode == 5
+
+    def test_do_while_with_var_does_not_crash(self):
+        """do/while loop declaring a variable should not segfault from stack leak"""
+        src = "int64 x = 0;\ndo {\n  int64 y = x;\n  x = x + 1;\n} while (x < 100);\nexit x % 256;"
+        result = run_executable(src)
+        assert result.returncode == 100
+
+    def test_do_while_large_loop_does_not_segfault(self):
+        """A long-running do/while loop with var decl must not overflow the stack"""
+        src = "int64 x = 0;\ndo {\n  int64 y = x;\n  x = x + 1;\n} while (x < 2000000);\nexit 42;"
+        result = run_executable(src)
+        assert result.returncode == 42
+
+    def test_do_while_print_output(self):
+        """do/while should print values correctly"""
+        result = run_executable("int64 x = 0;\ndo {\n  print x;\n  x = x + 1;\n} while (x < 3);")
+        assert result.stdout == "012"
+
+    def test_do_while_with_postfix_in_condition(self):
+        """do/while with postfix increment in condition"""
+        result = run_executable("int64 i = 0;\ndo {\n  print i;\n} while (i++ < 2);")
+        assert result.stdout == "012"
+
+    def test_do_while_nested_in_while(self):
+        """do/while nested inside a while loop"""
+        src = "int64 x = 0;\nwhile (x < 2) {\n  int64 y = 0;\n  do {\n    y = y + 1;\n  } while (y < 3);\n  x = x + 1;\n}\nexit x;"
+        result = run_executable(src)
+        assert result.returncode == 2
+
+    def test_do_while_differs_from_while(self):
+        """do/while executes body once even with false condition, unlike while"""
+        result_while = run_executable("int64 x = 0;\nwhile (0) {\n  x = x + 1;\n}\nexit x;")
+        assert result_while.returncode == 0
+        result_do_while = run_executable("int64 x = 0;\ndo {\n  x = x + 1;\n} while (0);\nexit x;")
+        assert result_do_while.returncode == 1
+
+
 class TestRuntimeFflush:
     def test_print_output_visible(self):
         """Print output should be visible (fflush in suffix)"""

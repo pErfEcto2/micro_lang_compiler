@@ -140,6 +140,14 @@ class ELSE_KEYWORD(KEYWORD):
     def __str__(self) -> str:
         return "else"
 
+@register_keyword("do")
+class DO_KEYWORD(KEYWORD):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+
+    def __str__(self) -> str:
+        return "do"
+
 class ASSIGN_KEYWORD(KEYWORD):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)

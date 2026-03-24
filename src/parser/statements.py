@@ -60,6 +60,15 @@ class IF_STATEMENT(STATEMENT):
     def __str__(self) -> str:
         return f"IF_STATEMENT(expr: {self.expr}, true_body: {self.true_body}, false_body: {self.false_body})"
 
+class DO_WHILE_STATEMENT(STATEMENT):
+    def __init__(self, line_number: int, expr: EXPRESSION, body: list[STATEMENT]) -> None:
+        super().__init__(line_number)
+        self.expr = expr
+        self.body: list[STATEMENT] = body
+
+    def __str__(self) -> str:
+        return f"DO_WHILE_STATEMENT(expr: {self.expr}, body: {self.body})"
+
 class WHILE_STATEMENT(STATEMENT):
     def __init__(self, line_number: int, expr: EXPRESSION, body: list[STATEMENT]) -> None:
         super().__init__(line_number)

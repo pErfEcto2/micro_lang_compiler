@@ -1,30 +1,21 @@
-# TRUE/FALSE boolean constants
-int64 x = 5;
+# do/while: always runs body at least once
+int64 i = 0;
+do {
+  print i;
+  print '\n';
+  i++;
+} while (i < 5);
 
-if (x > 0 == TRUE) {
-  print 'y';
-}
+# runs once even when condition is false
+int64 x = 42;
+do {
+  print x;
+  print '\n';
+} while (0);
 
-if (x > 0 == FALSE) {
-  print 'n';
-}
-
-# boolean arithmetic
-int64 sum = TRUE + TRUE + FALSE;
-print sum;
-
-# subtraction without spaces
-int64 a = 10-3-2;
-print a;
-
-# nested bare blocks
-int64 count = 0;
-while (count < 3) {
-  int64 tmp = count;
-  {
-    count = count + 1;
-  }
-}
-print count;
-
+# do/while with postfix in condition
+int64 n = 0;
+do {
+  print n;
+} while (n++ < 3);
 print '\n';

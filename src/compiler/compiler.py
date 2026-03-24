@@ -1,6 +1,6 @@
 from parser.expressions import BINARY_EXPRESSION, CHAR_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION
 from parser.program import PROGRAM
-from parser.statements import ASSIGN_STATEMENT, CHAR_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, EXIT_STATEMENT, FOR_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT, VARIABLE_TYPE, WHILE_STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CHAR_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, DO_WHILE_STATEMENT, EXIT_STATEMENT, FOR_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT, VARIABLE_TYPE, WHILE_STATEMENT
 from tokenizer.keywords import DECREMENT_KEYWORD, EQUALS_KEYWORD, GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INCREMENT_KEYWORD, INT_DIVISION_KEYWORD, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, PLUS_KEYWORD, UNARY_MATH_OPERATION
 
 
@@ -163,6 +163,9 @@ class Compiler:
 
     def _je(self, label: str) -> None:
         self._text_s.append(f"    je {label}")
+
+    def _jne(self, label: str) -> None:
+        self._text_s.append(f"    jne {label}")
 
     def _jmp(self, label: str) -> None:
         self._text_s.append(f"    jmp {label}")
@@ -583,8 +586,24 @@ class Compiler:
         self._pop("rax")
         self._mov(f"byte [rbp - {stack_offset}]", "al")
 
+    def _gen_do_while(self, expr: EXPRESSION, body: list[STATEMENT]) -> None:
+        label_id = self._gen_label()
+        start_label = f".do_while_start_{label_id}"
+
+        self._label(start_label)
+        
+        for statement in body:
+            self._compile_statement(statement)
+
+        self._eval_expr(expr)
+        self._pop("rax")
+        self._cmp("rax", "0")
+        self._jne(start_label)
+
     def _compile_statement(self, statement) -> None:
         match statement:
+            case DO_WHILE_STATEMENT():
+                self._gen_do_while(statement.expr, statement.body)
             case CHAR_STATEMENT():
                 self._gen_char(statement.identifier, statement.expr)
             case FOR_STATEMENT():
