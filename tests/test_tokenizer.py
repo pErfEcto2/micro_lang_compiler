@@ -1258,3 +1258,116 @@ class TestTokenizerDoKeyword:
         assert tokens[10].val == 5
         assert isinstance(tokens[11], CLOSE_BRACKET)
         assert isinstance(tokens[12], SEMICOLON)
+
+
+class TestTokenizerAssignBySum:
+    def test_assign_by_sum(self):
+        from tokenizer.keywords import ASSIGN_BY_SUM_KEYWORD
+        tokens = Tokenizer("+=").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], ASSIGN_BY_SUM_KEYWORD)
+
+    def test_assign_by_sum_repr(self):
+        tokens = Tokenizer("+=").tokenize()
+        assert repr(tokens[0]) == "+="
+
+    def test_assign_by_sum_statement_tokens(self):
+        from tokenizer.keywords import ASSIGN_BY_SUM_KEYWORD
+        tokens = Tokenizer("x += 5;").tokenize()
+        assert len(tokens) == 4
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert tokens[0].val == "x"
+        assert isinstance(tokens[1], ASSIGN_BY_SUM_KEYWORD)
+        assert isinstance(tokens[2], INT_LITERAL)
+        assert tokens[2].val == 5
+        assert isinstance(tokens[3], SEMICOLON)
+
+    def test_assign_by_sum_no_spaces(self):
+        from tokenizer.keywords import ASSIGN_BY_SUM_KEYWORD
+        tokens = Tokenizer("x+=1").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert isinstance(tokens[1], ASSIGN_BY_SUM_KEYWORD)
+        assert isinstance(tokens[2], INT_LITERAL)
+        assert tokens[2].val == 1
+
+    def test_plus_vs_assign_by_sum(self):
+        from tokenizer.keywords import PLUS_KEYWORD, ASSIGN_BY_SUM_KEYWORD
+        tokens = Tokenizer("a + b += 1").tokenize()
+        assert len(tokens) == 5
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert isinstance(tokens[1], PLUS_KEYWORD)
+        assert isinstance(tokens[2], IDENTIFIER)
+        assert isinstance(tokens[3], ASSIGN_BY_SUM_KEYWORD)
+        assert isinstance(tokens[4], INT_LITERAL)
+
+    def test_increment_vs_assign_by_sum(self):
+        from tokenizer.keywords import INCREMENT_KEYWORD, ASSIGN_BY_SUM_KEYWORD
+        tokens = Tokenizer("++ +=").tokenize()
+        assert len(tokens) == 2
+        assert isinstance(tokens[0], INCREMENT_KEYWORD)
+        assert isinstance(tokens[1], ASSIGN_BY_SUM_KEYWORD)
+
+    def test_assign_by_sum_preserves_line_number(self):
+        tokens = Tokenizer("\nx += 1;").tokenize()
+        assert tokens[1].line_number == 2
+
+
+class TestTokenizerAssignByDiff:
+    def test_assign_by_diff(self):
+        from tokenizer.keywords import ASSIGN_BY_DIFF_KEYWORD
+        tokens = Tokenizer("-=").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], ASSIGN_BY_DIFF_KEYWORD)
+
+    def test_assign_by_diff_repr(self):
+        tokens = Tokenizer("-=").tokenize()
+        assert repr(tokens[0]) == "-="
+
+    def test_assign_by_diff_statement_tokens(self):
+        from tokenizer.keywords import ASSIGN_BY_DIFF_KEYWORD
+        tokens = Tokenizer("x -= 5;").tokenize()
+        assert len(tokens) == 4
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert tokens[0].val == "x"
+        assert isinstance(tokens[1], ASSIGN_BY_DIFF_KEYWORD)
+        assert isinstance(tokens[2], INT_LITERAL)
+        assert tokens[2].val == 5
+        assert isinstance(tokens[3], SEMICOLON)
+
+    def test_assign_by_diff_no_spaces(self):
+        from tokenizer.keywords import ASSIGN_BY_DIFF_KEYWORD
+        tokens = Tokenizer("x-=1").tokenize()
+        assert len(tokens) == 3
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert isinstance(tokens[1], ASSIGN_BY_DIFF_KEYWORD)
+        assert isinstance(tokens[2], INT_LITERAL)
+        assert tokens[2].val == 1
+
+    def test_minus_vs_assign_by_diff(self):
+        from tokenizer.keywords import MINUS_KEYWORD, ASSIGN_BY_DIFF_KEYWORD
+        tokens = Tokenizer("a - b -= 1").tokenize()
+        assert len(tokens) == 5
+        assert isinstance(tokens[0], IDENTIFIER)
+        assert isinstance(tokens[1], MINUS_KEYWORD)
+        assert isinstance(tokens[2], IDENTIFIER)
+        assert isinstance(tokens[3], ASSIGN_BY_DIFF_KEYWORD)
+        assert isinstance(tokens[4], INT_LITERAL)
+
+    def test_decrement_emits_single_token(self):
+        """Regression: '--' must not also emit a trailing MINUS_KEYWORD"""
+        from tokenizer.keywords import DECREMENT_KEYWORD
+        tokens = Tokenizer("--").tokenize()
+        assert len(tokens) == 1
+        assert isinstance(tokens[0], DECREMENT_KEYWORD)
+
+    def test_decrement_vs_assign_by_diff(self):
+        from tokenizer.keywords import DECREMENT_KEYWORD, ASSIGN_BY_DIFF_KEYWORD
+        tokens = Tokenizer("-- -=").tokenize()
+        assert len(tokens) == 2
+        assert isinstance(tokens[0], DECREMENT_KEYWORD)
+        assert isinstance(tokens[1], ASSIGN_BY_DIFF_KEYWORD)
+
+    def test_assign_by_diff_preserves_line_number(self):
+        tokens = Tokenizer("\nx -= 1;").tokenize()
+        assert tokens[1].line_number == 2

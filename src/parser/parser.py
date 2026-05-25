@@ -1,7 +1,7 @@
 from parser.statements import ASSIGN_STATEMENT, CHAR_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, DO_WHILE_STATEMENT, EXIT_STATEMENT, FOR_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT, WHILE_STATEMENT
 from parser.program import PROGRAM
 from parser.expressions import BINARY_EXPRESSION, CHAR_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION
-from tokenizer.keywords import ASSIGN_KEYWORD, CHAR_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, DO_KEYWORD, ELSE_KEYWORD, EXIT_KEYWORD, FALSE_KEYWORD, FOR_KEYWORD, IF_KEYWORD, INT64_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MULTIPLY_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PRINT_KEYWORD, SEMICOLON, TRUE_KEYWORD, UNARY_MATH_OPERATION, WHILE_KEYWORD
+from tokenizer.keywords import ASSIGN_BY_DIFF_KEYWORD, ASSIGN_BY_SUM_KEYWORD, ASSIGN_KEYWORD, CHAR_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, DO_KEYWORD, ELSE_KEYWORD, EXIT_KEYWORD, FALSE_KEYWORD, FOR_KEYWORD, IF_KEYWORD, INT64_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MULTIPLY_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON, TRUE_KEYWORD, UNARY_MATH_OPERATION, WHILE_KEYWORD
 from tokenizer.literals import CHAR_LITERAL, INT_LITERAL
 from tokenizer.tokens import IDENTIFIER, Token
 
@@ -124,6 +124,7 @@ class Parser:
         if expect_semicolon:
             self._assert_current_token_type(SEMICOLON)
             self._consume()
+
         return INT64_STATEMENT(expr.line_number, identifier, expr)
 
     def _parse_print_statement(self) -> PRINT_STATEMENT:
@@ -133,15 +134,30 @@ class Parser:
         return PRINT_STATEMENT(expr.line_number, expr)
 
     def _parse_assign_statement(self, ln: int, name: str, expect_semicolon: bool = True) -> ASSIGN_STATEMENT:
-        self._assert_current_token_type(ASSIGN_KEYWORD)
-        self._consume()
         identifier = IDENTIFIER_EXPRESSION(ln, name)
+
+        if self._peek() is None:
+            raise ValueError("expected '=', '+=' or '-=' at the end of the program")
+        if not isinstance(self._peek(), (ASSIGN_KEYWORD, ASSIGN_BY_SUM_KEYWORD, ASSIGN_BY_DIFF_KEYWORD)):
+            raise ValueError(f"expected '=', '+=' or '-=' in line {self._peek().line_number}")
+
+        assign_type = self._consume()
         expr = self._parse_expr(self._consume())
+
+        match assign_type:
+            case ASSIGN_KEYWORD():
+                pass
+            case ASSIGN_BY_SUM_KEYWORD():
+                expr = BINARY_EXPRESSION(ln, IDENTIFIER_EXPRESSION(ln, identifier.name), PLUS_KEYWORD(ln), expr)
+            case ASSIGN_BY_DIFF_KEYWORD():
+                expr = BINARY_EXPRESSION(ln, IDENTIFIER_EXPRESSION(ln, identifier.name), MINUS_KEYWORD(ln), expr)
 
         if expect_semicolon:
             self._assert_current_token_type(SEMICOLON)
             self._consume()
+
         return ASSIGN_STATEMENT(expr.line_number, identifier, expr)
+
 
     def _parse_const_statement(self, ln: int) -> CONST_STATEMENT:
         t = self._consume()

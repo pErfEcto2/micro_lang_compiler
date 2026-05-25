@@ -155,6 +155,20 @@ class ASSIGN_KEYWORD(KEYWORD):
     def __str__(self) -> str:
         return "="
 
+class ASSIGN_BY_SUM_KEYWORD(KEYWORD):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+
+    def __str__(self) -> str:
+        return "+="
+
+class ASSIGN_BY_DIFF_KEYWORD(KEYWORD):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+
+    def __str__(self) -> str:
+        return "-="
+
 class MATH_OPERATION(KEYWORD):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)

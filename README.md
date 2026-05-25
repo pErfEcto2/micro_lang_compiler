@@ -8,6 +8,7 @@ A compiler for a minimal programming language that compiles to x86 assembly (NAS
 - `char` — declare character variables (single-byte, single-quoted literals with escape sequences)
 - `const` — declare constant (immutable) variables
 - `=` — reassign variables
+- `+=`, `-=` — compound assignment (add/subtract in place)
 - `{ }` — scoped blocks with local variables
 - `print` — print Int64 to console
 - `exit` — exit with a return code
@@ -43,6 +44,8 @@ python src/main.py -v <source.mil>   # verbose: show tokens, AST and assembly
 # compute and print a value
 int64 x = 10 + 2 * 4;
 x = x + 1;
+x += 2;
+x -= 1;
 print x;
 
 const int64 y = 42;

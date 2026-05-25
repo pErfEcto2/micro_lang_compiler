@@ -87,6 +87,41 @@ x = 10;
 x = x + 1;
 ```
 
+### Compound Assignment
+
+Use `+=` and `-=` to add to or subtract from a variable in place. `x += expr` is equivalent to `x = x + expr`, and `x -= expr` is equivalent to `x = x - expr`:
+
+```
+int64 x = 5;
+x += 3;     // x is now 8
+x -= 2;     // x is now 6
+print x;
+```
+
+The right-hand side can be any expression, not just a literal:
+
+```
+int64 x = 10;
+int64 y = 4;
+x += y * 2;  // x is now 18
+print x;
+```
+
+Compound assignment also works on `char` variables:
+
+```
+char c = 'a';
+c += 1;
+print c;     // prints 'b'
+```
+
+Compound assignment cannot be used on constants:
+
+```
+const int64 x = 5;
+x += 1;  // error: cant change constant 'x'
+```
+
 ### Increment / Decrement
 
 Use `++` and `--` to increment or decrement a variable by 1. Both prefix and postfix forms are supported:

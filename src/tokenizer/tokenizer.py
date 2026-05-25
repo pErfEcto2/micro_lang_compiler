@@ -1,4 +1,4 @@
-from tokenizer.keywords import ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, DECREMENT_KEYWORD, EQUALS_KEYWORD, GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INCREMENT_KEYWORD, INT64_KEYWORD, INT_DIVISION_KEYWORD, KEYWORDS, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, SEMICOLON
+from tokenizer.keywords import ASSIGN_BY_DIFF_KEYWORD, ASSIGN_BY_SUM_KEYWORD, ASSIGN_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, DECREMENT_KEYWORD, EQUALS_KEYWORD, GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INCREMENT_KEYWORD, INT64_KEYWORD, INT_DIVISION_KEYWORD, KEYWORDS, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, SEMICOLON
 from tokenizer.literals import CHAR_LITERAL, INT_LITERAL
 from tokenizer.tokens import Token, IDENTIFIER
 
@@ -147,6 +147,9 @@ class Tokenizer:
                 if self._peek() is not None and self._peek() == "+":
                     self._consume()
                     tokens.append(INCREMENT_KEYWORD(self._line_num))
+                elif self._peek() is not None and self._peek() == "=":
+                    self._consume()
+                    tokens.append(ASSIGN_BY_SUM_KEYWORD(self._line_num))
                 else:
                     tokens.append(PLUS_KEYWORD(self._line_num))
             
@@ -154,9 +157,11 @@ class Tokenizer:
                 if self._peek() is not None and self._peek() == "-":
                     self._consume()
                     tokens.append(DECREMENT_KEYWORD(self._line_num))
-                    continue
-
-                tokens.append(MINUS_KEYWORD(self._line_num))
+                elif self._peek() is not None and self._peek() == "=":
+                    self._consume()
+                    tokens.append(ASSIGN_BY_DIFF_KEYWORD(self._line_num))
+                else:
+                    tokens.append(MINUS_KEYWORD(self._line_num))
 
             elif char == "*":
                 tokens.append(MULTIPLY_KEYWORD(self._line_num))

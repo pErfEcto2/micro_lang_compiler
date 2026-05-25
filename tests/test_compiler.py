@@ -1651,3 +1651,98 @@ class TestCompilerNestedBareBlocks:
         # The inner scope should be cleaned up (add rsp) inside the loop body
         assert "    add rsp, 8" in result
 
+
+class TestCompilerAssignBySumStatement:
+    def test_assign_by_sum_emits_add(self):
+        # x += 5 is desugared by the parser into ASSIGN_STATEMENT(x, BINARY(x, +, 5)).
+        # The compiler should emit `add rax, rbx`.
+        expr = BINARY_EXPRESSION(2, IDENTIFIER_EXPRESSION(2, "x"), PLUS_KEYWORD(2), INT_EXPRESSION(2, 5))
+        prog = _make_program(
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 10)),
+            ASSIGN_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "x"), expr),
+        )
+        result = Compiler(prog).compile()
+        assert "    add rax, rbx" in result
+        assert "    mov qword [rbp - 8], rax" in result
+
+    def test_assign_by_sum_loads_then_stores_same_slot(self):
+        expr = BINARY_EXPRESSION(2, IDENTIFIER_EXPRESSION(2, "x"), PLUS_KEYWORD(2), INT_EXPRESSION(2, 1))
+        prog = _make_program(
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 0)),
+            ASSIGN_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "x"), expr),
+        )
+        result = Compiler(prog).compile()
+        # value loaded from the same slot it is written back to
+        assert "    mov rax, qword [rbp - 8]" in result
+        assert "    mov qword [rbp - 8], rax" in result
+
+    def test_assign_by_sum_unknown_var_raises(self):
+        expr = BINARY_EXPRESSION(1, IDENTIFIER_EXPRESSION(1, "y"), PLUS_KEYWORD(1), INT_EXPRESSION(1, 1))
+        prog = _make_program(
+            ASSIGN_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "y"), expr),
+        )
+        with pytest.raises(ValueError, match="unknown identifier"):
+            Compiler(prog).compile()
+
+    def test_assign_by_sum_on_const_raises(self):
+        expr = BINARY_EXPRESSION(2, IDENTIFIER_EXPRESSION(2, "x"), PLUS_KEYWORD(2), INT_EXPRESSION(2, 1))
+        prog = _make_program(
+            CONST_STATEMENT(1, INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5))),
+            ASSIGN_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "x"), expr),
+        )
+        with pytest.raises(ValueError, match="cant change constant"):
+            Compiler(prog).compile()
+
+    def test_full_pipeline_assign_by_sum(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("int64 x = 5;\nx += 3;\nexit x;").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    add rax, rbx" in result
+        # the +=  must not leak a stray sub/dec
+        assert "    sub rax, rbx" not in result
+
+
+class TestCompilerAssignByDiffStatement:
+    def test_assign_by_diff_emits_sub(self):
+        expr = BINARY_EXPRESSION(2, IDENTIFIER_EXPRESSION(2, "x"), MINUS_KEYWORD(2), INT_EXPRESSION(2, 3))
+        prog = _make_program(
+            INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 10)),
+            ASSIGN_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "x"), expr),
+        )
+        result = Compiler(prog).compile()
+        assert "    sub rax, rbx" in result
+        assert "    mov qword [rbp - 8], rax" in result
+
+    def test_assign_by_diff_on_const_raises(self):
+        expr = BINARY_EXPRESSION(2, IDENTIFIER_EXPRESSION(2, "x"), MINUS_KEYWORD(2), INT_EXPRESSION(2, 1))
+        prog = _make_program(
+            CONST_STATEMENT(1, INT64_STATEMENT(1, IDENTIFIER_EXPRESSION(1, "x"), INT_EXPRESSION(1, 5))),
+            ASSIGN_STATEMENT(2, IDENTIFIER_EXPRESSION(2, "x"), expr),
+        )
+        with pytest.raises(ValueError, match="cant change constant"):
+            Compiler(prog).compile()
+
+    def test_full_pipeline_assign_by_diff(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        tokens = Tokenizer("int64 x = 10;\nx -= 3;\nexit x;").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    sub rax, rbx" in result
+
+
+class TestCompilerCompoundAssignChar:
+    def test_compound_assign_on_char_uses_byte(self):
+        from tokenizer.tokenizer import Tokenizer
+        from parser.parser import Parser
+
+        # char slot is 1 byte; compound assignment must store back as `byte ... al`
+        tokens = Tokenizer("char c = 'a';\nc += 1;\nprint c;").tokenize()
+        prog = Parser(tokens).parse()
+        result = Compiler(prog).compile()
+        assert "    mov byte [rbp - 8], al" in result
+

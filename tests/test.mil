@@ -1,21 +1,14 @@
-# do/while: always runs body at least once
-int64 i = 0;
-do {
-  print i;
-  print '\n';
-  i++;
-} while (i < 5);
+# sum 0..9 using += inside a for loop, then trim with -=
+int64 sum = 0;
+for (int64 i = 0; i < 10; i++) {
+  sum += i;
+}
+sum -= 5;
+print sum;
+print '\n';
 
-# runs once even when condition is false
-int64 x = 42;
-do {
-  print x;
-  print '\n';
-} while (0);
-
-# do/while with postfix in condition
-int64 n = 0;
-do {
-  print n;
-} while (n++ < 3);
+# compound assignment works on char too
+char c = 'a';
+c += 2;
+print c;
 print '\n';

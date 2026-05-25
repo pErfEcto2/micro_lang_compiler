@@ -3,7 +3,7 @@ from parser.parser import Parser
 from parser.program import PROGRAM
 from parser.statements import ASSIGN_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, DO_WHILE_STATEMENT, EXIT_STATEMENT, FOR_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, WHILE_STATEMENT
 from parser.expressions import BINARY_EXPRESSION, CHAR_EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION
-from tokenizer.keywords import ASSIGN_KEYWORD, CHAR_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, DECREMENT_KEYWORD, DO_KEYWORD, ELSE_KEYWORD, EQUALS_KEYWORD, EXIT_KEYWORD, FOR_KEYWORD, IF_KEYWORD, INCREMENT_KEYWORD, INT64_KEYWORD, LESS_KEYWORD, MINUS_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON, WHILE_KEYWORD
+from tokenizer.keywords import ASSIGN_BY_DIFF_KEYWORD, ASSIGN_BY_SUM_KEYWORD, ASSIGN_KEYWORD, CHAR_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, DECREMENT_KEYWORD, DO_KEYWORD, ELSE_KEYWORD, EQUALS_KEYWORD, EXIT_KEYWORD, FOR_KEYWORD, IF_KEYWORD, INCREMENT_KEYWORD, INT64_KEYWORD, LESS_KEYWORD, MINUS_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON, WHILE_KEYWORD
 from tokenizer.literals import CHAR_LITERAL, INT_LITERAL
 from tokenizer.tokens import IDENTIFIER
 
@@ -2261,3 +2261,145 @@ class TestParserDoWhileIntegration:
         tokens = Tokenizer(src).tokenize()
         with pytest.raises(ValueError, match="expected"):
             Parser(tokens).parse()
+
+
+class TestParserAssignBySumStatement:
+    def test_simple_assign_by_sum(self):
+        tokens = [
+            IDENTIFIER(1, "x"), ASSIGN_BY_SUM_KEYWORD(1), INT_LITERAL(1, 5), SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, ASSIGN_STATEMENT)
+        assert stmt.identifier.name == "x"
+        # desugared to x = x + 5
+        assert isinstance(stmt.expr, BINARY_EXPRESSION)
+        assert isinstance(stmt.expr.lval, IDENTIFIER_EXPRESSION)
+        assert stmt.expr.lval.name == "x"
+        assert isinstance(stmt.expr.op, PLUS_KEYWORD)
+        assert isinstance(stmt.expr.rval, INT_EXPRESSION)
+        assert stmt.expr.rval.val == 5
+
+    def test_assign_by_sum_with_expression(self):
+        tokens = [
+            IDENTIFIER(1, "x"), ASSIGN_BY_SUM_KEYWORD(1),
+            INT_LITERAL(1, 1), PLUS_KEYWORD(1), INT_LITERAL(1, 2), SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt, ASSIGN_STATEMENT)
+        # x = x + (1 + 2)
+        assert isinstance(stmt.expr, BINARY_EXPRESSION)
+        assert isinstance(stmt.expr.op, PLUS_KEYWORD)
+        assert isinstance(stmt.expr.rval, BINARY_EXPRESSION)
+
+    def test_assign_by_sum_with_identifier_rhs(self):
+        tokens = [
+            IDENTIFIER(1, "x"), ASSIGN_BY_SUM_KEYWORD(1),
+            IDENTIFIER(1, "y"), SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert isinstance(stmt.expr, BINARY_EXPRESSION)
+        assert stmt.expr.lval.name == "x"
+        assert isinstance(stmt.expr.rval, IDENTIFIER_EXPRESSION)
+        assert stmt.expr.rval.name == "y"
+
+    def test_assign_by_sum_missing_semicolon(self):
+        tokens = [IDENTIFIER(1, "x"), ASSIGN_BY_SUM_KEYWORD(1), INT_LITERAL(1, 5)]
+        with pytest.raises(ValueError, match="expected"):
+            Parser(tokens).parse()
+
+    def test_assign_by_sum_preserves_line_number(self):
+        tokens = [
+            IDENTIFIER(7, "x"), ASSIGN_BY_SUM_KEYWORD(7), INT_LITERAL(7, 1), SEMICOLON(7),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        assert stmt.expr.line_number == 7
+
+
+class TestParserAssignByDiffStatement:
+    def test_simple_assign_by_diff(self):
+        tokens = [
+            IDENTIFIER(1, "x"), ASSIGN_BY_DIFF_KEYWORD(1), INT_LITERAL(1, 3), SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 1
+        stmt = program.statements[0]
+        assert isinstance(stmt, ASSIGN_STATEMENT)
+        assert stmt.identifier.name == "x"
+        # desugared to x = x - 3
+        assert isinstance(stmt.expr, BINARY_EXPRESSION)
+        assert isinstance(stmt.expr.lval, IDENTIFIER_EXPRESSION)
+        assert stmt.expr.lval.name == "x"
+        assert isinstance(stmt.expr.op, MINUS_KEYWORD)
+        assert isinstance(stmt.expr.rval, INT_EXPRESSION)
+        assert stmt.expr.rval.val == 3
+
+    def test_assign_by_diff_with_expression(self):
+        tokens = [
+            IDENTIFIER(1, "x"), ASSIGN_BY_DIFF_KEYWORD(1),
+            INT_LITERAL(1, 2), MULTIPLY_KEYWORD(1), INT_LITERAL(1, 3), SEMICOLON(1),
+        ]
+        program = Parser(tokens).parse()
+        stmt = program.statements[0]
+        # x = x - (2 * 3)
+        assert isinstance(stmt.expr, BINARY_EXPRESSION)
+        assert isinstance(stmt.expr.op, MINUS_KEYWORD)
+        assert isinstance(stmt.expr.rval, BINARY_EXPRESSION)
+        assert isinstance(stmt.expr.rval.op, MULTIPLY_KEYWORD)
+
+    def test_assign_by_diff_missing_semicolon(self):
+        tokens = [IDENTIFIER(1, "x"), ASSIGN_BY_DIFF_KEYWORD(1), INT_LITERAL(1, 5)]
+        with pytest.raises(ValueError, match="expected"):
+            Parser(tokens).parse()
+
+
+class TestParserCompoundAssignIntegration:
+    def test_full_pipeline_assign_by_sum(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("int64 x = 1;\nx += 5;").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 2
+        assert isinstance(program.statements[0], INT64_STATEMENT)
+        stmt = program.statements[1]
+        assert isinstance(stmt, ASSIGN_STATEMENT)
+        assert stmt.identifier.name == "x"
+        assert isinstance(stmt.expr, BINARY_EXPRESSION)
+        assert isinstance(stmt.expr.op, PLUS_KEYWORD)
+        assert stmt.expr.lval.name == "x"
+        assert stmt.expr.rval.val == 5
+
+    def test_full_pipeline_assign_by_diff(self):
+        from tokenizer.tokenizer import Tokenizer
+        tokens = Tokenizer("int64 x = 10;\nx -= 3;").tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 2
+        stmt = program.statements[1]
+        assert isinstance(stmt, ASSIGN_STATEMENT)
+        assert isinstance(stmt.expr, BINARY_EXPRESSION)
+        assert isinstance(stmt.expr.op, MINUS_KEYWORD)
+
+    def test_full_pipeline_compound_with_other_var_on_rhs(self):
+        from tokenizer.tokenizer import Tokenizer
+        src = "int64 a = 5;\nint64 b = 3;\na += b;"
+        tokens = Tokenizer(src).tokenize()
+        program = Parser(tokens).parse()
+        stmt = program.statements[2]
+        assert isinstance(stmt, ASSIGN_STATEMENT)
+        assert isinstance(stmt.expr.rval, IDENTIFIER_EXPRESSION)
+        assert stmt.expr.rval.name == "b"
+
+    def test_full_pipeline_compound_inside_loop(self):
+        from tokenizer.tokenizer import Tokenizer
+        src = "int64 s = 0;\nint64 i = 0;\nwhile (i < 5) {\n  s += i;\n  i++;\n}"
+        tokens = Tokenizer(src).tokenize()
+        program = Parser(tokens).parse()
+        assert len(program.statements) == 3
+        assert isinstance(program.statements[2], WHILE_STATEMENT)
+        assigns = [s for s in program.statements[2].body if isinstance(s, ASSIGN_STATEMENT)]
+        assert len(assigns) == 1
+        assert isinstance(assigns[0].expr, BINARY_EXPRESSION)
+        assert isinstance(assigns[0].expr.op, PLUS_KEYWORD)

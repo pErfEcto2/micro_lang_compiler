@@ -15,8 +15,8 @@
 | `for` | Loop |
 | `=` | Assign |
 | `const` | Make a variable constant |
-| `+=` | Assignment by sum *(not implemented)* |
-| `-=` | Assignment by difference *(not implemented)* |
+| `+=` | Assignment by sum |
+| `-=` | Assignment by difference |
 
 ## Math operators
 

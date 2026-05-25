@@ -1190,3 +1190,150 @@ class TestRuntimeFflush:
         result = run_executable("print 'A';")
         assert result.returncode == 0
         assert "A" in result.stdout
+
+
+class TestMainAssignBySumStatement:
+    def test_assign_by_sum_creates_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("int64 x = 1;\nx += 5;\nexit x;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "add rax, rbx" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_const_assign_by_sum_fails(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("const int64 x = 1;\nx += 5;")
+            src_path = f.name
+
+        try:
+            result = run_compiler("-n", src_path)
+            assert result.returncode != 0
+        finally:
+            os.unlink(src_path)
+
+    def test_assign_by_sum_undeclared_fails(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("x += 5;")
+            src_path = f.name
+
+        try:
+            result = run_compiler("-n", src_path)
+            assert result.returncode != 0
+        finally:
+            os.unlink(src_path)
+
+
+class TestMainAssignByDiffStatement:
+    def test_assign_by_diff_creates_asm(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("int64 x = 10;\nx -= 3;\nexit x;")
+            src_path = f.name
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "test_out")
+                result = run_compiler("-n", "-o", out_path, src_path)
+                assert result.returncode == 0
+                with open(out_path + ".asm") as f:
+                    content = f.read()
+                assert "sub rax, rbx" in content
+        finally:
+            os.unlink(src_path)
+
+    def test_const_assign_by_diff_fails(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mil", delete=False) as f:
+            f.write("const int64 x = 5;\nx -= 1;")
+            src_path = f.name
+
+        try:
+            result = run_compiler("-n", src_path)
+            assert result.returncode != 0
+        finally:
+            os.unlink(src_path)
+
+
+class TestRuntimeAssignBySum:
+    def test_assign_by_sum_int(self):
+        result = run_executable("int64 x = 5;\nx += 3;\nexit x;")
+        assert result.returncode == 8
+
+    def test_assign_by_sum_with_variable_rhs(self):
+        result = run_executable("int64 a = 10;\nint64 b = 7;\na += b;\nexit a;")
+        assert result.returncode == 17
+
+    def test_assign_by_sum_with_expression_rhs(self):
+        # x = 1 + (2 * 3) = 7
+        result = run_executable("int64 x = 1;\nx += 2 * 3;\nexit x;")
+        assert result.returncode == 7
+
+    def test_assign_by_sum_chained(self):
+        result = run_executable("int64 x = 0;\nx += 1;\nx += 2;\nx += 3;\nexit x;")
+        assert result.returncode == 6
+
+    def test_assign_by_sum_in_loop(self):
+        # sum of 0..4 = 10
+        src = "int64 s = 0;\nint64 i = 0;\nwhile (i < 5) {\n  s += i;\n  i++;\n}\nexit s;"
+        result = run_executable(src)
+        assert result.returncode == 10
+
+    def test_assign_by_sum_in_for_loop(self):
+        # 1+2+3+4+5 = 15
+        src = "int64 s = 0;\nfor (int64 i = 1; i <= 5; i++) {\n  s += i;\n}\nexit s;"
+        result = run_executable(src)
+        assert result.returncode == 15
+
+    def test_assign_by_sum_on_char(self):
+        # 'a' + 1 = 'b'
+        result = run_executable("char c = 'a';\nc += 1;\nprint c;")
+        assert result.returncode == 0
+        assert "b" in result.stdout
+
+    def test_assign_by_sum_with_print(self):
+        result = run_executable("int64 x = 100;\nx += 23;\nprint x;")
+        assert result.returncode == 0
+        assert "123" in result.stdout
+
+
+class TestRuntimeAssignByDiff:
+    def test_assign_by_diff_int(self):
+        result = run_executable("int64 x = 10;\nx -= 3;\nexit x;")
+        assert result.returncode == 7
+
+    def test_assign_by_diff_with_variable_rhs(self):
+        result = run_executable("int64 a = 20;\nint64 b = 5;\na -= b;\nexit a;")
+        assert result.returncode == 15
+
+    def test_assign_by_diff_chained(self):
+        result = run_executable("int64 x = 100;\nx -= 10;\nx -= 20;\nx -= 30;\nexit x;")
+        assert result.returncode == 40
+
+    def test_assign_by_diff_in_loop(self):
+        # countdown from 10 by 2: 10, 8, 6, 4, 2, 0 → 5 iterations
+        src = "int64 x = 10;\nint64 n = 0;\nwhile (x > 0) {\n  x -= 2;\n  n++;\n}\nexit n;"
+        result = run_executable(src)
+        assert result.returncode == 5
+
+    def test_assign_by_diff_on_char(self):
+        # 'c' - 2 = 'a'
+        result = run_executable("char c = 'c';\nc -= 2;\nprint c;")
+        assert result.returncode == 0
+        assert "a" in result.stdout
+
+    def test_mixed_compound_assigns(self):
+        # 0 + 10 + 5 - 3 = 12
+        result = run_executable("int64 x = 0;\nx += 10;\nx += 5;\nx -= 3;\nexit x;")
+        assert result.returncode == 12
+
+    def test_decrement_not_double_emitted_regression(self):
+        """Regression: x-- must not also emit a stray `-` (would break parsing)."""
+        result = run_executable("int64 x = 5;\nx--;\nexit x;")
+        assert result.returncode == 4

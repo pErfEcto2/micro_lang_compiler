@@ -13,3 +13,4 @@ wheels/
 *.out
 *.o
 .claude/
+CLAUDE.md
