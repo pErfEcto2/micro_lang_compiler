@@ -197,6 +197,13 @@ class MULTIPLY_KEYWORD(MATH_OPERATION):
     def __str__(self) -> str:
         return "*"
 
+class AMPERSAND_KEYWORD(KEYWORD):
+    def __init__(self, line_num: int) -> None:
+        super().__init__(line_num)
+
+    def __str__(self) -> str:
+        return "&"
+
 class INT_DIVISION_KEYWORD(MATH_OPERATION):
     def __init__(self, line_num: int) -> None:
         super().__init__(line_num)

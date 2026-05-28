@@ -1,14 +1,22 @@
-# sum 0..9 using += inside a for loop, then trim with -=
-int64 sum = 0;
-for (int64 i = 0; i < 10; i++) {
-  sum += i;
-}
-sum -= 5;
-print sum;
+char c = 'A';
+char* p = &c;
+
+print c;
 print '\n';
 
-# compound assignment works on char too
-char c = 'a';
-c += 2;
+print p;  
+print '\n';
+
+print *p;
+print '\n';
+
+*p  = 'B';
+
 print c;
+print '\n';
+
+print p;  
+print '\n';
+
+print *p;
 print '\n';

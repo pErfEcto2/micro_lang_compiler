@@ -1,7 +1,7 @@
-from parser.statements import ASSIGN_STATEMENT, CHAR_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, DO_WHILE_STATEMENT, EXIT_STATEMENT, FOR_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT, WHILE_STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CHAR_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, DO_WHILE_STATEMENT, EXIT_STATEMENT, FOR_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POINTER_ASSIGN_STATEMENT, POINTER_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT, WHILE_STATEMENT
 from parser.program import PROGRAM
-from parser.expressions import BINARY_EXPRESSION, CHAR_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION
-from tokenizer.keywords import ASSIGN_BY_DIFF_KEYWORD, ASSIGN_BY_SUM_KEYWORD, ASSIGN_KEYWORD, CHAR_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, DO_KEYWORD, ELSE_KEYWORD, EXIT_KEYWORD, FALSE_KEYWORD, FOR_KEYWORD, IF_KEYWORD, INT64_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MULTIPLY_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON, TRUE_KEYWORD, UNARY_MATH_OPERATION, WHILE_KEYWORD
+from parser.expressions import ADDRESS_OF_EXPRESSION, BINARY_EXPRESSION, CHAR_EXPRESSION, DEREF_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION
+from tokenizer.keywords import AMPERSAND_KEYWORD, ASSIGN_BY_DIFF_KEYWORD, ASSIGN_BY_SUM_KEYWORD, ASSIGN_KEYWORD, CHAR_KEYWORD, CLOSE_BRACKET, CLOSE_C_BRACKET, CONST_KEYWORD, DO_KEYWORD, ELSE_KEYWORD, EXIT_KEYWORD, FALSE_KEYWORD, FOR_KEYWORD, IF_KEYWORD, INT64_KEYWORD, KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MULTIPLY_KEYWORD, OPEN_BRACKET, OPEN_C_BRACKET, PLUS_KEYWORD, PRINT_KEYWORD, SEMICOLON, TRUE_KEYWORD, UNARY_MATH_OPERATION, WHILE_KEYWORD
 from tokenizer.literals import CHAR_LITERAL, INT_LITERAL
 from tokenizer.tokens import IDENTIFIER, Token
 
@@ -86,6 +86,16 @@ class Parser:
                 left = INT_EXPRESSION(ln, 0)
                 return self._get_expr(left, min_bp, ln)
 
+            case AMPERSAND_KEYWORD():
+                identifier = IDENTIFIER_EXPRESSION(ln, self._consume().val)
+                left = ADDRESS_OF_EXPRESSION(ln, identifier)
+                return self._get_expr(left, min_bp, ln)
+
+            case MULTIPLY_KEYWORD():
+                identifier = IDENTIFIER_EXPRESSION(ln, self._consume().val)
+                left = DEREF_EXPRESSION(ln, identifier)
+                return self._get_expr(left, min_bp, ln)
+
             case _:
                 raise ValueError(f"unexpected expression '{token}' in line {ln}")
 
@@ -161,13 +171,7 @@ class Parser:
 
     def _parse_const_statement(self, ln: int) -> CONST_STATEMENT:
         t = self._consume()
-        match t:
-            case INT64_KEYWORD():
-                return CONST_STATEMENT(ln, self._parse_int64_statement())
-            case CHAR_KEYWORD():
-                return CONST_STATEMENT(ln, self._parse_char_statement())
-            case _:
-                raise ValueError(f"unknown type '{type(t)}' in line {t.line_number}")
+        return CONST_STATEMENT(ln, self._create_statement(t))
 
     def _parse_while_statement(self, ln: int) -> WHILE_STATEMENT:
         self._assert_current_token_type(OPEN_BRACKET)
@@ -264,12 +268,63 @@ class Parser:
 
         return DO_WHILE_STATEMENT(ln, expr, body)
 
+    def _parse_pointer_statement(self, pointee_size: int, expect_semicolon: bool = True) -> POINTER_STATEMENT:
+        ln = self._consume().line_number
+        self._assert_current_token_type(IDENTIFIER)
+        identifier = self._consume()
+        identifier = IDENTIFIER_EXPRESSION(ln, identifier.val)
+
+        self._assert_current_token_type(ASSIGN_KEYWORD)
+        self._consume()
+
+        expr = self._parse_expr(self._consume())
+        
+        if expect_semicolon:
+            self._assert_current_token_type(SEMICOLON)
+            self._consume()
+
+        return POINTER_STATEMENT(ln, identifier, expr, pointee_size)
+
+    def _parse_pointer_assign_statement(self, ln: int, expect_semicolon: bool = True) -> POINTER_ASSIGN_STATEMENT:
+        if self._peek() is None:
+            raise ValueError(f"invalid syntax at the end of the program")
+
+        self._assert_current_token_type(IDENTIFIER)
+        identifier = self._consume()
+        identifier = IDENTIFIER_EXPRESSION(ln, identifier.val)
+
+        if self._peek() is None:
+            raise ValueError("expected '=', '+=' or '-=' at the end of the program")
+        if not isinstance(self._peek(), (ASSIGN_KEYWORD, ASSIGN_BY_SUM_KEYWORD, ASSIGN_BY_DIFF_KEYWORD)):
+            raise ValueError(f"expected '=', '+=' or '-=' in line {self._peek().line_number}")
+
+        assign_type = self._consume()
+        expr = self._parse_expr(self._consume())
+
+        match assign_type:
+            case ASSIGN_KEYWORD():
+                pass
+            case ASSIGN_BY_SUM_KEYWORD():
+                expr = BINARY_EXPRESSION(ln, IDENTIFIER_EXPRESSION(ln, identifier.name), PLUS_KEYWORD(ln), expr)
+            case ASSIGN_BY_DIFF_KEYWORD():
+                expr = BINARY_EXPRESSION(ln, IDENTIFIER_EXPRESSION(ln, identifier.name), MINUS_KEYWORD(ln), expr)
+
+        if expect_semicolon:
+            self._assert_current_token_type(SEMICOLON)
+            self._consume()
+
+        return POINTER_ASSIGN_STATEMENT(expr.line_number, identifier, expr)
+
+
     def _create_statement(self, token, expect_semicolon: bool = True) -> STATEMENT | None:
         match token:
             case DO_KEYWORD():
                 return self._parse_do_while_statement(token.line_number)
             case CHAR_KEYWORD():
-                return self._parse_char_statement(expect_semicolon=expect_semicolon)
+                if self._peek() is not None and isinstance(self._peek(), MULTIPLY_KEYWORD):
+                    return self._parse_pointer_statement(1, expect_semicolon=expect_semicolon)
+                else:
+                    return self._parse_char_statement(expect_semicolon=expect_semicolon)
             case FOR_KEYWORD():
                 return self._parse_for_statement(token.line_number)
             case UNARY_MATH_OPERATION():
@@ -292,11 +347,16 @@ class Parser:
             case EXIT_KEYWORD():
                 return self._parse_exit_statement()
             case INT64_KEYWORD():
-                return self._parse_int64_statement(expect_semicolon=expect_semicolon)
+                if self._peek() is not None and isinstance(self._peek(), MULTIPLY_KEYWORD):
+                    return self._parse_pointer_statement(8, expect_semicolon=expect_semicolon)
+                else:
+                    return self._parse_int64_statement(expect_semicolon=expect_semicolon)
             case PRINT_KEYWORD():
                 return self._parse_print_statement()
             case SEMICOLON():
                 return
+            case MULTIPLY_KEYWORD():
+                return self._parse_pointer_assign_statement(token.line_number, expect_semicolon=expect_semicolon)
             case _:
                 raise ValueError(f"unexpected token '{token}' in line {token.line_number}")
 

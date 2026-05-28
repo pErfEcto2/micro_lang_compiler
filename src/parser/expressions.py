@@ -44,6 +44,22 @@ class IDENTIFIER_EXPRESSION(EXPRESSION):
     def __str__(self) -> str:
         return f"{self.name}"
 
+class ADDRESS_OF_EXPRESSION(EXPRESSION):
+    def __init__(self, line_number: int, identifier: IDENTIFIER_EXPRESSION) -> None:
+        super().__init__(line_number)
+        self.identifier: IDENTIFIER_EXPRESSION = identifier
+
+    def __str__(self) -> str:
+        return f"&{self.identifier}"
+
+class DEREF_EXPRESSION(EXPRESSION):
+    def __init__(self, line_number: int, identifier: IDENTIFIER_EXPRESSION) -> None:
+        super().__init__(line_number)
+        self.identifier: IDENTIFIER_EXPRESSION = identifier
+
+    def __str__(self) -> str:
+        return f"*{self.identifier}"
+
 class UNARY_EXPRESSION(EXPRESSION):
     def __init__(self, line_number: int, op: UNARY_MATH_OPERATION, identifier: IDENTIFIER_EXPRESSION) -> None:
         super().__init__(line_number)

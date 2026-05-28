@@ -1,6 +1,6 @@
 from parser.ast_node import ASTNode
 from parser.expressions import EXPRESSION, IDENTIFIER_EXPRESSION
-from tokenizer.keywords import UNARY_MATH_OPERATION
+from tokenizer.keywords import KEYWORD, UNARY_MATH_OPERATION
 
 
 class STATEMENT(ASTNode):
@@ -42,6 +42,14 @@ class INT64_STATEMENT(VARIABLE_TYPE):
 
     def __str__(self) -> str:
         return f"INT64_STATEMENT(identifier: {self.identifier}, expr: {self.expr})"
+
+class POINTER_STATEMENT(VARIABLE_TYPE):
+    def __init__(self, line_number: int, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION, pointee_size: int) -> None:
+        self.pointee_size: int = pointee_size
+        super().__init__(line_number, identifier, expr, 8)
+
+    def __str__(self) -> str:
+        return f"POINTER_STATEMENT(identifier: {self.identifier}, expr: {self.expr}, pointee_size: {self.pointee_size})"
 
 class CHAR_STATEMENT(VARIABLE_TYPE):
     def __init__(self, line_number: int, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION) -> None:
@@ -97,6 +105,15 @@ class ASSIGN_STATEMENT(STATEMENT):
 
     def __str__(self) -> str:
         return f"ASSIGN_STATEMENT(identifier: {self.identifier}, expr: {self.expr})"
+
+class POINTER_ASSIGN_STATEMENT(STATEMENT):
+    def __init__(self, line_number: int, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION) -> None:
+        super().__init__(line_number)
+        self.identifier: IDENTIFIER_EXPRESSION = identifier
+        self.expr: EXPRESSION = expr
+
+    def __str__(self) -> str:
+        return f"POINTER_ASSIGN_STATEMENT(identifier: {self.identifier}, expr: {self.expr})"
 
 class OPEN_C_STATEMENT(STATEMENT):
     def __init__(self, line_number: int) -> None:

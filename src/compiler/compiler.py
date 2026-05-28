@@ -1,13 +1,15 @@
-from parser.expressions import BINARY_EXPRESSION, CHAR_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION
+from parser.expressions import ADDRESS_OF_EXPRESSION, BINARY_EXPRESSION, CHAR_EXPRESSION, DEREF_EXPRESSION, EXPRESSION, IDENTIFIER_EXPRESSION, INT_EXPRESSION, POSTFIX_EXPRESSION, PREFIX_EXPRESSION
 from parser.program import PROGRAM
-from parser.statements import ASSIGN_STATEMENT, CHAR_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, DO_WHILE_STATEMENT, EXIT_STATEMENT, FOR_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT, VARIABLE_TYPE, WHILE_STATEMENT
+from parser.statements import ASSIGN_STATEMENT, CHAR_STATEMENT, CLOSE_C_STATEMENT, CONST_STATEMENT, DO_WHILE_STATEMENT, EXIT_STATEMENT, FOR_STATEMENT, IF_STATEMENT, INT64_STATEMENT, OPEN_C_STATEMENT, POINTER_ASSIGN_STATEMENT, POINTER_STATEMENT, POSTFIX_STATEMENT, PREFIX_STATEMENT, PRINT_STATEMENT, STATEMENT, VARIABLE_TYPE, WHILE_STATEMENT
 from tokenizer.keywords import DECREMENT_KEYWORD, EQUALS_KEYWORD, GREATER_KEYWORD, GREATER_OR_EQUALS_KEYWORD, INCREMENT_KEYWORD, INT_DIVISION_KEYWORD, LESS_KEYWORD, LESS_OR_EQUALS_KEYWORD, MATH_OPERATION, MINUS_KEYWORD, MODULO_KEYWORD, MULTIPLY_KEYWORD, NOT_EQUALS_KEYWORD, PLUS_KEYWORD, UNARY_MATH_OPERATION
+from tokenizer.tokens import IDENTIFIER
 
 
 class Scope:
     def __init__(self, line_number: int, stack_offset: int = 0) -> None:
         self._vars: dict[str, tuple[int, int]] = {}
         self._consts: dict[str, tuple[int, int]] = {}
+        self._pointers: dict[str, tuple[int, int]] = {}
         self._size: int = 0
         self._stack_offset: int = stack_offset
         self.line_number: int = line_number
@@ -20,14 +22,21 @@ class Scope:
         self._size += 8
         self._consts[const_name] = (const_size, self._size + self._stack_offset)
 
+    def add_pointer(self, pointer_name: str, pointee_size: int) -> None:
+        self._size += 8
+        self._pointers[pointer_name] = (pointee_size, self._size + self._stack_offset)
+
     def has_var(self, name: str) -> bool:
         return name in self._vars
 
     def has_const(self, name: str) -> bool:
         return name in self._consts
 
+    def has_pointer(self, name: str) -> bool:
+        return name in self._pointers
+
     def has(self, name: str) -> bool:
-        return self.has_var(name) or self.has_const(name)
+        return self.has_var(name) or self.has_const(name) or self.has_pointer(name)
 
     def get(self, name: str) -> tuple[int, int]:
         """
@@ -35,6 +44,8 @@ class Scope:
         """
         if name in self._vars:
             return self._vars[name]
+        elif name in self._pointers:
+            return self._pointers[name]
         return self._consts[name]
 
     def get_size(self) -> int:
@@ -63,6 +74,9 @@ class Compiler:
     def _add_var(self, name: str, var_size: int) -> None:
         self._scopes[-1].add_var(name, var_size)
 
+    def _add_pointer(self, name: str, pointee_size: int) -> None:
+        self._scopes[-1].add_pointer(name, pointee_size)
+
     def _get_stack_offset(self, name: str) -> tuple[int, int]:
         """
         returns: tuple[size, stack_offset]
@@ -73,7 +87,7 @@ class Compiler:
 
         raise ValueError(f"unknown identifier '{name}'")
 
-    def _has_var_or_const(self, name: str) -> bool:
+    def _has(self, name: str) -> bool:
         for scope in self._scopes:
             if scope.has(name):
                 return True
@@ -88,6 +102,12 @@ class Compiler:
     def _has_const(self, name: str) -> bool:
         for scope in self._scopes:
             if scope.has_const(name):
+                return True
+        return False
+
+    def _has_pointer(self, name: str) -> bool:
+        for scope in self._scopes:
+            if scope.has_pointer(name):
                 return True
         return False
 
@@ -202,8 +222,42 @@ class Compiler:
 
     def _eval_expr(self, expr: EXPRESSION) -> None:
         match expr:
+            case ADDRESS_OF_EXPRESSION():
+                if not self._has(expr.identifier.name):
+                    raise ValueError(f"var '{expr.identifier.name}' is undefined (line {expr.line_number})")
+
+                size, stack_offset = self._get_stack_offset(expr.identifier.name)
+
+                match size:
+                    case 1:
+                        var_size = "byte"
+                    case 8:
+                        var_size = "qword"
+                    case _:
+                        raise ValueError(f"invalid var size '{size}'")
+
+                self._lea("rax", f"{var_size} [rbp - {stack_offset}]")
+                self._push("rax")
+
             case INT_EXPRESSION() | CHAR_EXPRESSION():
                 self._push(str(expr.val))
+
+            case DEREF_EXPRESSION():
+                if not self._has(expr.identifier.name):
+                    raise ValueError(f"var '{expr.identifier.name}' is undefined (line {expr.line_number})")
+
+                pointee_size, stack_offset = self._get_stack_offset(expr.identifier.name)
+                
+                self._mov("rax", f"qword [rbp - {stack_offset}]")
+                match pointee_size:
+                    case 1:
+                        self._movzx("rax", f"byte [rax]")
+                    case 8:
+                        self._mov("rax", f"qword [rax]")
+                    case _:
+                        raise ValueError(f"invalid var size '{pointee_size}'")
+
+                self._push("rax")
 
             case BINARY_EXPRESSION():
                 self._eval_expr(expr.rval)
@@ -261,11 +315,14 @@ class Compiler:
                     case _:
                         raise ValueError(f"invalid operation type '{type(expr.op)}' ('{MATH_OPERATION}' expected)")
             case IDENTIFIER_EXPRESSION():
-
-                if not self._has_var_or_const(expr.name):
+                if not self._has(expr.name):
                     raise ValueError(f"unknown identifier '{expr.name}' in line {expr.line_number}")
 
                 size, stack_offset = self._get_stack_offset(expr.name)
+
+                if self._has_pointer(expr.name):
+                    size = 8
+
                 match size:
                     case 1:
                         self._movzx("rax", f"byte [rbp - {stack_offset}]")
@@ -354,7 +411,7 @@ class Compiler:
         else:
             raise ValueError(f"identifier {identifier} already exists (line {identifier.line_number})")
 
-        size, stack_offset = self._get_stack_offset(identifier.name)
+        _, stack_offset = self._get_stack_offset(identifier.name)
         self._sub("rsp", "8")
         self._eval_expr(expr)
         self._pop("rax")
@@ -365,11 +422,28 @@ class Compiler:
         self._eval_expr(expr)
 
         match expr:
+            case DEREF_EXPRESSION():
+                pointee_size, _ = self._get_stack_offset(expr.identifier.name)
+                
+                match pointee_size:
+                    case 1:
+                        fmt = "char_fmt_str"
+                        self._data_s.add(f"{fmt} db \"%c\", 0")
+                    case 8:
+                        fmt = "int64_fmt_str"
+                        self._data_s.add(f"{fmt} db \"%lld\", 0")
+                    case _:
+                        raise ValueError(f"invalid expression size '{pointee_size}' in line {expr.line_number}")
+
             case CHAR_EXPRESSION():
                 fmt = "char_fmt_str"
                 self._data_s.add(f"{fmt} db \"%c\", 0")
             case IDENTIFIER_EXPRESSION():
                 size, _ = self._get_stack_offset(expr.name)
+
+                if self._has_pointer(expr.name):
+                    size = 8
+                
                 match size:
                     case 1:
                         fmt = "char_fmt_str"
@@ -378,8 +452,8 @@ class Compiler:
                         fmt = "int64_fmt_str"
                         self._data_s.add(f"{fmt} db \"%lld\", 0")
                     case _:
-                        raise ValueError(f"invalid expression size in line {expr.line_number}")
-            case INT_EXPRESSION() | BINARY_EXPRESSION():
+                        raise ValueError(f"invalid expression size '{size}' in line {expr.line_number}")
+            case INT_EXPRESSION() | BINARY_EXPRESSION() | ADDRESS_OF_EXPRESSION():
                 fmt = "int64_fmt_str"
                 self._data_s.add(f"{fmt} db \"%lld\", 0")
             case POSTFIX_EXPRESSION():
@@ -405,7 +479,7 @@ class Compiler:
                     case _:
                         raise ValueError(f"invalid expression size in line {expr.line_number}")
             case _:
-                raise ValueError(f"invalid expression in line {expr.line_number}")
+                raise ValueError(f"invalid expression '{expr}' in line {expr.line_number}")
 
         self._pop("rsi")
         self._lea("rdi", f"[{fmt}]")
@@ -600,8 +674,32 @@ class Compiler:
         self._cmp("rax", "0")
         self._jne(start_label)
 
+    def _gen_pointer(self, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION, pointee_size: int) -> None:
+        current_scope = self._scopes[-1]
+        if current_scope.has_const(identifier.name):
+            raise ValueError(f"constant {identifier} already exists (line {identifier.line_number})")
+        elif current_scope.has_var(identifier.name):
+            raise ValueError(f"var {identifier} already exists (line {identifier.line_number})")
+        elif not current_scope.has_pointer(identifier.name):
+            self._add_pointer(identifier.name, pointee_size)
+        else:
+            raise ValueError(f"pointer {identifier} already exists (line {identifier.line_number})")
+
+        _, stack_offset = self._get_stack_offset(identifier.name)
+
+        self._sub("rsp", "8")
+        self._eval_expr(expr)
+        self._pop("rax")
+        self._mov(f"qword [rbp - {stack_offset}]", "rax")
+
+    def _gen_pointer_assign(self, identifier: IDENTIFIER_EXPRESSION, expr: EXPRESSION) -> None:
+        print("pointer assign")
+        exit(0)
+
     def _compile_statement(self, statement) -> None:
         match statement:
+            case POINTER_ASSIGN_STATEMENT():
+                self._gen_pointer_assign(statement.identifier, statement.expr)
             case DO_WHILE_STATEMENT():
                 self._gen_do_while(statement.expr, statement.body)
             case CHAR_STATEMENT():
@@ -626,6 +724,8 @@ class Compiler:
                 self._gen_int64(statement.identifier, statement.expr)
             case PRINT_STATEMENT():
                 self._gen_print(statement.expr)
+            case POINTER_STATEMENT():
+                self._gen_pointer(statement.identifier, statement.expr, statement.pointee_size)
             case ASSIGN_STATEMENT():
                 self._gen_assign(statement.identifier, statement.expr)
             case _:
